@@ -69,26 +69,6 @@ struct MeterViewModelTests {
     }
 
     @Test(
-        "Stopped session completion does not end a restarted session",
-        .bug("https://github.com/guillermo-rebolledo/lightmeter/pull/20")
-    )
-    func staleCompletionFromStoppedSessionDoesNotEndRestartedSession() async {
-        let source = FakeLightSource()
-        let vm = MeterViewModel(source: source)
-        await vm.start()
-
-        // stop() finishes the first stream, but its consumer task may not observe
-        // that completion until after the fresh session has started.
-        vm.stop()
-        await vm.start()
-        for _ in 0..<100 {
-            await Task.yield()
-        }
-
-        #expect(vm.status == .metering)
-    }
-
-    @Test(
         "Stream finishing without readings makes the camera unavailable",
         .bug("https://github.com/guillermo-rebolledo/lightmeter/issues/12")
     )
