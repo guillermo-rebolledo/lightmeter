@@ -186,4 +186,84 @@ struct MeterViewModelTests {
         #expect(vm.triangle.iso.label == "200")
         #expect(abs(atISO100 / vm.triangle.shutter!.value - 2) < 0.01)
     }
+
+    // MARK: - Dial binding
+
+    /// Tapping a chip binds the dial to that leg; nothing is bound to start.
+    @Test func bindingTheDialSelectsAnEditableLeg() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        #expect(vm.boundComponent == nil)
+
+        vm.bindDial(to: .aperture)
+        #expect(vm.boundComponent == .aperture)
+    }
+
+    /// Only one leg is ever bound — binding a new leg replaces the old one.
+    @Test func bindingAnotherLegReplacesTheCurrentOne() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        vm.bindDial(to: .aperture)
+        vm.bindDial(to: .iso)
+        #expect(vm.boundComponent == .iso)
+    }
+
+    /// Tapping the already-bound chip toggles the dial off.
+    @Test func bindingTheBoundLegAgainUnbinds() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        vm.bindDial(to: .aperture)
+        vm.bindDial(to: .aperture)
+        #expect(vm.boundComponent == nil)
+    }
+
+    /// The solved (non-editable) leg can't be bound — there's nothing to dial.
+    @Test func theSolvedLegCannotBeBound() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        vm.bindDial(to: .shutter) // shutter is solved in aperture-priority
+        #expect(vm.boundComponent == nil)
+    }
+
+    /// The bound stops and the current index describe the bound leg's scale and
+    /// where its value sits on it (aperture f/8 is index 18 on the f-scale).
+    @Test func boundStopsAndIndexTrackTheBoundLeg() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        #expect(vm.boundStops.isEmpty)
+        #expect(vm.boundStopIndex == nil)
+
+        vm.bindDial(to: .aperture)
+        #expect(vm.boundStops == PhotographicScale.aperture.stops)
+        #expect(vm.boundStops[vm.boundStopIndex!].label == "8")
+    }
+
+    /// Driving the dial to a new stop sets the bound leg and re-solves the
+    /// triangle live: opening the aperture two stops (f/8 → f/4) lets in 4× the
+    /// light, so the solved shutter runs 4× faster — the ticket's demo behavior.
+    @Test func steppingTheBoundLegResolvesTheTriangleLive() async {
+        let source = FakeLightSource()
+        let vm = MeterViewModel(source: source)
+        vm.setAperture(8)
+        vm.bindDial(to: .aperture)
+        await vm.start()
+
+        source.emit(LightReading(iso: 100, exposureDuration: 1.0 / 128.0, aperture: 16))
+        await waitUntil { vm.triangle.shutter != nil }
+        let atF8 = vm.triangle.shutter!.value
+        let f8Index = vm.boundStopIndex!
+
+        // Two 1/3-stop clicks per stop → six clicks opens two full stops to f/4.
+        vm.setBoundStopIndex(f8Index - 6)
+        #expect(vm.triangle.aperture.label == "4")
+        #expect(abs(atF8 / vm.triangle.shutter!.value - 4) < 0.01)
+    }
+
+    /// Stepping past the end of a scale clamps to the last stop rather than
+    /// running off the end.
+    @Test func steppingClampsToTheScaleBounds() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        vm.bindDial(to: .iso)
+
+        vm.setBoundStopIndex(9_999)
+        #expect(vm.boundStopIndex == PhotographicScale.iso.stops.count - 1)
+
+        vm.setBoundStopIndex(-9_999)
+        #expect(vm.boundStopIndex == 0)
+    }
 }
