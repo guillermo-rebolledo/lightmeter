@@ -233,11 +233,20 @@ struct ContentView: View {
     ) -> CGRect? {
         switch step {
         case .settings:
+            // Full-bleed geometry often reports only the sensor/status inset.
+            // Toolbar items sit in the 44pt nav-bar band beneath that, so when
+            // the inset is status-only we add the bar height before bottom-
+            // aligning the cutout to the content edge.
             let size = 44.0
             let trailing = 16.0
+            let barHeight = 44.0
+            let topInset = geometry.safeAreaInsets.top
+            let contentTop = topInset < barHeight + 30
+                ? topInset + barHeight
+                : topInset
             return CGRect(
                 x: geometry.size.width - trailing - size,
-                y: max(geometry.safeAreaInsets.top - size, 0),
+                y: contentTop - size,
                 width: size,
                 height: size
             )
