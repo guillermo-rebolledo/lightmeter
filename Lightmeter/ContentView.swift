@@ -61,14 +61,14 @@ struct ContentView: View {
                     }
                 }
             }
-            // Toolbar preferences resolve in a different space; mirror the gear
-            // with a non-interactive content anchor so step 6 can spotlight it.
+            // Toolbar items live in the 44pt nav-bar band above content. Anchor a
+            // matching proxy there so the spotlight can resolve in content space.
             .overlay(alignment: .topTrailing) {
                 Color.clear
                     .frame(width: 44, height: 44)
                     .guidedTourAnchor(.settings)
-                    .padding(.top, 4)
-                    .padding(.trailing, 12)
+                    .padding(.trailing, 8)
+                    .offset(y: -44)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
