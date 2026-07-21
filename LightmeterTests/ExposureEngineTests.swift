@@ -199,6 +199,48 @@ struct ExposureEngineTests {
         #expect(triangle.aperture?.label == "16")
     }
 
+    // MARK: - EV compensation
+
+    /// Positive compensation deliberately overexposes: at fixed ISO and
+    /// aperture, +1 EV doubles the solved exposure duration by one stop.
+    @Test func positiveCompensationShiftsTheSolveTowardOverexposure() {
+        let triangle = ExposureEngine.solvedTriangle(
+            mode: .aperturePriority,
+            evAtISO100: 15,
+            compensation: 1,
+            iso: 100,
+            aperture: 16,
+            shutter: 1.0 / 125
+        )
+
+        #expect(triangle.shutter?.label == "1/60")
+    }
+
+    /// Negative compensation deliberately underexposes: at fixed ISO and
+    /// aperture, −1 EV halves the solved exposure duration by one stop.
+    @Test func negativeCompensationShiftsTheSolveTowardUnderexposure() {
+        let triangle = ExposureEngine.solvedTriangle(
+            mode: .aperturePriority,
+            evAtISO100: 15,
+            compensation: -1,
+            iso: 100,
+            aperture: 16,
+            shutter: 1.0 / 125
+        )
+
+        #expect(triangle.shutter?.label == "1/250")
+    }
+
+    /// Compensation is additive in stop-space: two successive nudges have the
+    /// same target EV as their sum.
+    @Test func compensationIsAdditive() {
+        let afterFirst = ExposureEngine.targetEV(evAtISO100: 15, compensation: 2.0 / 3)
+        let afterSecond = ExposureEngine.targetEV(evAtISO100: afterFirst, compensation: 1.0 / 3)
+        let combined = ExposureEngine.targetEV(evAtISO100: 15, compensation: 1)
+
+        #expect(abs(afterSecond - combined) < 1e-12)
+    }
+
     // MARK: - Advisories
 
     @Test func shutterAdvisoriesRespectThresholdEdges() {

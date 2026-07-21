@@ -46,11 +46,18 @@ struct ContentView: View {
             Spacer()
             VStack(spacing: 16) {
                 evReadout
-                FreezeButton(
-                    isFrozen: model.isFrozen,
-                    canFreeze: model.latestReading != nil,
-                    onToggle: model.toggleFreeze
-                )
+                HStack(spacing: 10) {
+                    FreezeButton(
+                        isFrozen: model.isFrozen,
+                        canFreeze: model.latestReading != nil,
+                        onToggle: model.toggleFreeze
+                    )
+                    CompensationControl(
+                        value: model.compensationLabel,
+                        isBound: model.isCompensationDialBound,
+                        onSelect: model.bindCompensationDial
+                    )
+                }
                 AdvisoriesView(advisories: model.advisories)
                 MeteringPatternToggle(
                     pattern: model.pattern,
@@ -74,19 +81,19 @@ struct ContentView: View {
                 .padding(.top, 8)
         }
         .padding(.bottom, 44)
-        .animation(reduceMotion ? nil : .snappy, value: model.boundComponent)
+        .animation(reduceMotion ? nil : .snappy, value: model.dialCaption)
     }
 
-    /// The arc dial, shown only while a chip is bound. It drives the bound leg by
-    /// stop index and re-solves the triangle live.
+    /// The shared arc dial, shown while an exposure chip or EV compensation is
+    /// bound. It drives that target by detent index and re-solves live.
     @ViewBuilder
     private var dial: some View {
-        if let boundComponent = model.boundComponent, let index = model.boundStopIndex {
+        if let index = model.dialStopIndex, let caption = model.dialCaption {
             ArcDialView(
-                stops: model.boundStops,
+                labels: model.dialLabels,
                 selectedIndex: index,
-                caption: boundComponent.caption,
-                onSelect: { model.setBoundStopIndex($0) }
+                caption: caption,
+                onSelect: { model.setDialStopIndex($0) }
             )
             .transition(reduceMotion
                 ? .opacity

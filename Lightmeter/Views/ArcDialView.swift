@@ -7,13 +7,13 @@ import UIKit
 /// that makes the dial feel mechanical. Snapping is stop-to-stop; the arc always
 /// settles on a real, dial-able mark.
 ///
-/// The dial is a pure controller: `selectedIndex` and `stops` are the source of
+/// The dial is a pure controller: `selectedIndex` and `labels` are the source of
 /// truth (owned by `MeterViewModel`), and `onSelect` reports each new detent up.
 /// A drag is expressed in continuous stop-units and rounded to the nearest stop,
 /// so the same gesture drives both the visual sweep and the reported value.
 struct ArcDialView: View {
-    /// The dial-able stops laid out along the arc.
-    let stops: [PhotographicScale.Stop]
+    /// The detent labels laid out along the arc.
+    let labels: [String]
     /// The stop the fixed indicator currently points at.
     let selectedIndex: Int
     /// The leg being dialed, e.g. `"Aperture"` — announced to VoiceOver.
@@ -76,10 +76,10 @@ struct ArcDialView: View {
         .gesture(dialGesture)
         .accessibilityElement()
         .accessibilityLabel(caption)
-        .accessibilityValue(stops[safe: selectedIndex]?.label ?? "")
+        .accessibilityValue(labels[safe: selectedIndex] ?? "")
         .accessibilityAdjustableAction { direction in
             switch direction {
-            case .increment: onSelect(min(selectedIndex + 1, stops.count - 1))
+            case .increment: onSelect(min(selectedIndex + 1, labels.count - 1))
             case .decrement: onSelect(max(selectedIndex - 1, 0))
             @unknown default: break
             }
@@ -95,7 +95,7 @@ struct ArcDialView: View {
         let distance = abs(CGFloat(index) - position)
 
         return VStack(spacing: 6) {
-            Text(stops[index].label)
+            Text(labels[index])
                 .font(.system(size: isSelected ? 19 : 15,
                               weight: isSelected ? .semibold : .regular,
                               design: .rounded))
@@ -152,7 +152,7 @@ struct ArcDialView: View {
                 // Dragging left advances toward higher values; one `pointsPerStop`
                 // of travel is one stop.
                 let raw = CGFloat(dragAnchorIndex) - value.translation.width / pointsPerStop
-                let clamped = min(max(raw, 0), CGFloat(stops.count - 1))
+                let clamped = min(max(raw, 0), CGFloat(labels.count - 1))
                 dragPosition = clamped
 
                 let rounded = Int(clamped.rounded())
@@ -180,7 +180,7 @@ struct ArcDialView: View {
     private var visibleIndices: [Int] {
         let center = Int(position.rounded())
         let lower = max(center - visibleSpan, 0)
-        let upper = min(center + visibleSpan, stops.count - 1)
+        let upper = min(center + visibleSpan, labels.count - 1)
         return Array(lower...upper)
     }
 
@@ -207,7 +207,7 @@ private extension Array {
                 VStack {
                     Spacer()
                     ArcDialView(
-                        stops: PhotographicScale.aperture.stops,
+                        labels: PhotographicScale.aperture.stops.map(\.label),
                         selectedIndex: index,
                         caption: "Aperture",
                         onSelect: { index = $0 }

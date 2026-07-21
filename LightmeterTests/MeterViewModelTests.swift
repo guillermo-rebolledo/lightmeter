@@ -235,6 +235,44 @@ struct MeterViewModelTests {
         #expect(abs(atISO100 / vm.triangle.shutter!.value - 2) < 0.01)
     }
 
+    // MARK: - EV compensation
+
+    /// Compensation is observable state that immediately flows through the
+    /// current solve: +1 EV doubles the aperture-priority exposure duration.
+    @Test func compensationFlowsIntoTheCurrentSolve() async {
+        let source = FakeLightSource()
+        let vm = MeterViewModel(source: source)
+        vm.setAperture(16)
+        await vm.start()
+
+        source.emit(LightReading(iso: 100, exposureDuration: 1.0 / 128.0, aperture: 16))
+        await waitUntil { vm.triangle.shutter != nil }
+        #expect(vm.triangle.shutter?.label == "1/125")
+
+        vm.setCompensation(1)
+
+        #expect(vm.compensation == 1)
+        #expect(vm.triangle.shutter?.label == "1/60")
+    }
+
+    /// The compensation control binds the same arc dial at zero, and three
+    /// one-third-stop detents move it to +1 EV.
+    @Test func compensationControlUsesTheSharedDetentedDial() throws {
+        let vm = MeterViewModel(source: FakeLightSource())
+
+        vm.bindCompensationDial()
+        let zeroIndex = try #require(vm.dialStopIndex)
+
+        #expect(vm.isCompensationDialBound)
+        #expect(vm.boundComponent == nil)
+        #expect(vm.dialLabels[zeroIndex].contains("0.0"))
+
+        vm.setDialStopIndex(zeroIndex + 3)
+
+        #expect(vm.compensation == 1)
+        #expect(vm.compensationLabel == "+1.0 EV")
+    }
+
     // MARK: - Dial binding
 
     /// Tapping a chip binds the dial to that leg; nothing is bound to start.

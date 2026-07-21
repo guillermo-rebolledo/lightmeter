@@ -89,6 +89,14 @@ enum ExposureEngine {
         (shutter * pow(2, evAtISO100) * (iso / 100)).squareRoot()
     }
 
+    /// Converts the metered scene EV into the target EV for the solve.
+    ///
+    /// Positive compensation asks for more exposure, so it lowers the target EV;
+    /// negative compensation asks for less exposure and raises it.
+    static func targetEV(evAtISO100: Double, compensation: Double) -> Double {
+        evAtISO100 - compensation
+    }
+
     /// Builds the exposure triangle for the active priority mode: snaps the two
     /// legs the photographer set to real stops and, once the scene has been
     /// metered, solves and snaps the third — flagging it as the computed leg.
@@ -107,15 +115,19 @@ enum ExposureEngine {
     static func solvedTriangle(
         mode: PriorityMode,
         evAtISO100: Double?,
+        compensation: Double = 0,
         iso: Double,
         aperture: Double,
         shutter: Double
     ) -> ExposureTriangle {
         let isoStop = PhotographicScale.iso.snap(iso)
+        let compensatedEV = evAtISO100.map {
+            targetEV(evAtISO100: $0, compensation: compensation)
+        }
         switch mode {
         case .aperturePriority:
             let apertureStop = PhotographicScale.aperture.snap(aperture)
-            let shutterStop = evAtISO100.map { ev in
+            let shutterStop = compensatedEV.map { ev in
                 PhotographicScale.shutter.snap(
                     shutterDuration(evAtISO100: ev, iso: isoStop.value, aperture: apertureStop.value)
                 )
@@ -128,7 +140,7 @@ enum ExposureEngine {
             )
         case .shutterPriority:
             let shutterStop = PhotographicScale.shutter.snap(shutter)
-            let apertureStop = evAtISO100.map { ev in
+            let apertureStop = compensatedEV.map { ev in
                 PhotographicScale.aperture.snap(
                     apertureFNumber(evAtISO100: ev, iso: isoStop.value, shutter: shutterStop.value)
                 )
@@ -152,18 +164,20 @@ enum ExposureEngine {
     static func advisories(
         mode: PriorityMode,
         evAtISO100: Double?,
+        compensation: Double = 0,
         iso: Double,
         aperture: Double,
         shutter: Double
     ) -> [ExposureAdvisory] {
         guard let evAtISO100 else { return [] }
+        let compensatedEV = targetEV(evAtISO100: evAtISO100, compensation: compensation)
 
         let isoStop = PhotographicScale.iso.snap(iso)
         switch mode {
         case .aperturePriority:
             let apertureStop = PhotographicScale.aperture.snap(aperture)
             let solvedShutter = shutterDuration(
-                evAtISO100: evAtISO100,
+                evAtISO100: compensatedEV,
                 iso: isoStop.value,
                 aperture: apertureStop.value
             )
@@ -181,7 +195,7 @@ enum ExposureEngine {
         case .shutterPriority:
             let shutterStop = PhotographicScale.shutter.snap(shutter)
             let solvedAperture = apertureFNumber(
-                evAtISO100: evAtISO100,
+                evAtISO100: compensatedEV,
                 iso: isoStop.value,
                 shutter: shutterStop.value
             )
