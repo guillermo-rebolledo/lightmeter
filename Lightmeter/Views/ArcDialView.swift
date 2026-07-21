@@ -76,6 +76,7 @@ struct ArcDialView: View {
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .mask(edgeFade)
+            .transaction { $0.animation = nil }
             .opacity(isBound ? 1 : 0)
             .animation(.easeOut(duration: 0.15), value: isBound)
 
