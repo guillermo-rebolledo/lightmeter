@@ -54,12 +54,21 @@ struct ContentView: View {
                     CameraStatusView(status: .unavailable)
                 }
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink(value: Destination.settings) {
-                        Label("Settings", systemImage: "gearshape")
-                    }
+            // Own the gear in content space (not ToolbarItem) so the tour
+            // anchor and the tappable control share one resolved frame.
+            // Avoid `.offset` — it moves pixels without moving layout bounds,
+            // which leaves the spotlight stranded away from the gear.
+            .overlay(alignment: .topTrailing) {
+                NavigationLink(value: Destination.settings) {
+                    Label("Settings", systemImage: "gearshape")
+                        .labelStyle(.iconOnly)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .guidedTourAnchor(.settings)
+                .padding(.top, 4)
+                .padding(.trailing, 8)
             }
             // Resolve tour anchors in the same full-screen space the spotlight
             // draws into. An outer overlay under-reports Y by the top safe area,
@@ -68,14 +77,10 @@ struct ContentView: View {
                 GeometryReader { geometry in
                     if tour.isPresented,
                        let step = tour.currentStep,
-                       let targetFrame = tourTargetFrame(
-                        for: step,
-                        anchors: anchors,
-                        geometry: geometry
-                       ) {
+                       let anchor = anchors[step] {
                         GuidedTourOverlay(
                             step: step,
-                            targetFrame: targetFrame,
+                            targetFrame: geometry[anchor],
                             progressLabel: tour.progressLabel,
                             onAdvance: tour.advance,
                             onSkip: tour.skip
@@ -224,37 +229,6 @@ struct ContentView: View {
         }
     }
 
-    /// Toolbar items don't publish reliable content-space anchors, so Settings
-    /// is synthesized to the standard trailing nav-bar button slot.
-    private func tourTargetFrame(
-        for step: GuidedTourStep,
-        anchors: [GuidedTourStep: Anchor<CGRect>],
-        geometry: GeometryProxy
-    ) -> CGRect? {
-        switch step {
-        case .settings:
-            // Full-bleed geometry often reports only the sensor/status inset.
-            // Toolbar items sit in the 44pt nav-bar band beneath that, so when
-            // the inset is status-only we add the bar height before bottom-
-            // aligning the cutout to the content edge.
-            let size = 44.0
-            let trailing = 16.0
-            let barHeight = 44.0
-            let topInset = geometry.safeAreaInsets.top
-            let contentTop = topInset < barHeight + 30
-                ? topInset + barHeight
-                : topInset
-            return CGRect(
-                x: geometry.size.width - trailing - size,
-                y: contentTop - size,
-                width: size,
-                height: size
-            )
-        case .evReadout, .meteringPattern, .priorityAndChips, .arcDial, .compensation:
-            guard let anchor = anchors[step] else { return nil }
-            return geometry[anchor]
-        }
-    }
 }
 
 #Preview {
