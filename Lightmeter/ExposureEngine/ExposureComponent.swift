@@ -17,13 +17,12 @@ enum ExposureComponent: Equatable, Sendable {
         }
     }
 
-    /// The photographic scale this leg dials along — the detents the arc dial
-    /// lays out for it.
-    var scale: PhotographicScale {
+    /// The photographic scale this leg dials along at the selected increment.
+    func scale(for increment: StopIncrement) -> PhotographicScale {
         switch self {
-        case .iso: return .iso
-        case .aperture: return .aperture
-        case .shutter: return .shutter
+        case .iso: return .iso(for: increment)
+        case .aperture: return .aperture(for: increment)
+        case .shutter: return .shutter(for: increment)
         }
     }
 }

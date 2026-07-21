@@ -153,6 +153,45 @@ struct MeterViewModelTests {
 
     // MARK: - Exposure triangle
 
+    @Test func selectedIncrementDrivesTheCurrentTriangle() async throws {
+        let source = FakeLightSource()
+        let suiteName = "MeterViewModelTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preferences = MeterPreferences(defaults: defaults)
+        preferences.increment = .full
+        let vm = MeterViewModel(source: source, preferences: preferences)
+        vm.setAperture(1)
+        await vm.start()
+
+        source.emit(LightReading(iso: 100, exposureDuration: 1.0 / 90, aperture: 1))
+        await waitUntil { vm.triangle.shutter != nil }
+
+        #expect(vm.triangle.shutter?.label == "1/125")
+    }
+
+    @Test func calibrationImmediatelyBiasesTheCurrentReadingAndSolve() async throws {
+        let source = FakeLightSource()
+        let suiteName = "MeterViewModelTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preferences = MeterPreferences(defaults: defaults)
+        let vm = MeterViewModel(source: source, preferences: preferences)
+        vm.setAperture(1)
+        await vm.start()
+
+        source.emit(LightReading(iso: 100, exposureDuration: 1.0 / 90, aperture: 1))
+        await waitUntil { vm.ev != nil }
+        let uncalibratedEV = try #require(vm.ev)
+        #expect(vm.triangle.shutter?.label == "1/100")
+
+        preferences.calibrationOffset = 1.0 / 3
+
+        let calibratedEV = try #require(vm.ev)
+        #expect(abs(calibratedEV - (uncalibratedEV + 1.0 / 3)) < 1e-12)
+        #expect(vm.triangle.shutter?.label == "1/125")
+    }
+
     /// Before any reading the two set legs show, the shutter is pending, and the
     /// shutter is flagged as the solved (non-editable) leg.
     @Test func triangleShowsSetLegsWithPendingShutterBeforeMetering() {

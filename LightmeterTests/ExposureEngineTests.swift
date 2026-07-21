@@ -199,7 +199,36 @@ struct ExposureEngineTests {
         #expect(triangle.aperture?.label == "16")
     }
 
+    @Test(arguments: [
+        (increment: StopIncrement.third, expectedShutter: "1/100"),
+        (increment: StopIncrement.half, expectedShutter: "1/90"),
+        (increment: StopIncrement.full, expectedShutter: "1/125"),
+    ])
+    func solvedTriangleHonorsTheSelectedIncrement(
+        _ example: (increment: StopIncrement, expectedShutter: String)
+    ) {
+        let triangle = ExposureEngine.solvedTriangle(
+            mode: .aperturePriority,
+            evAtISO100: log2(90),
+            increment: example.increment,
+            iso: 100,
+            aperture: 1,
+            shutter: 1.0 / 125
+        )
+
+        #expect(triangle.shutter?.label == example.expectedShutter)
+    }
+
     // MARK: - EV compensation
+
+    @Test func calibrationOffsetBiasesTheMeteredReading() {
+        let calibrated = ExposureEngine.calibratedEV(
+            evAtISO100: 12,
+            calibrationOffset: 1.0 / 3
+        )
+
+        #expect(abs(calibrated - (12 + 1.0 / 3)) < 1e-12)
+    }
 
     /// At fixed ISO and aperture, positive compensation doubles the duration
     /// toward overexposure while negative compensation halves it.

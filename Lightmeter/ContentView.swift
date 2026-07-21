@@ -5,37 +5,60 @@ import UIKit
 /// EV@ISO100 read out over it and updating in real time. Falls back to a graceful
 /// denied state when camera access isn't granted.
 struct ContentView: View {
+    private enum Destination: Hashable {
+        case settings
+    }
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var camera: CameraLightSource
     @State private var model: MeterViewModel
+    @State private var preferences: MeterPreferences
 
-    init() {
+    init(defaults: UserDefaults = .standard) {
         let camera = CameraLightSource()
+        let preferences = MeterPreferences(defaults: defaults)
         _camera = State(initialValue: camera)
-        _model = State(initialValue: MeterViewModel(source: camera))
+        _model = State(initialValue: MeterViewModel(source: camera, preferences: preferences))
+        _preferences = State(initialValue: preferences)
     }
 
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
+        NavigationStack {
+            ZStack {
+                Color.black.ignoresSafeArea()
 
-            switch model.status {
-            case .idle, .metering:
-                CameraPreviewView(
-                    session: camera.session,
-                    spot: model.spot,
-                    isSpotActive: model.pattern == .spot,
-                    onPlaceSpot: { model.placeSpot(at: $0) }
-                )
-                .ignoresSafeArea()
-                meterOverlay
-            case .denied:
-                DeniedView()
+                switch model.status {
+                case .idle, .metering:
+                    CameraPreviewView(
+                        session: camera.session,
+                        spot: model.spot,
+                        isSpotActive: model.pattern == .spot,
+                        onPlaceSpot: { model.placeSpot(at: $0) }
+                    )
+                    .ignoresSafeArea()
+                    meterOverlay
+                case .denied:
+                    DeniedView()
+                }
             }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink(value: Destination.settings) {
+                        Label("Settings", systemImage: "gearshape")
+                    }
+                }
+            }
+            .navigationDestination(for: Destination.self) { destination in
+                switch destination {
+                case .settings:
+                    SettingsView(preferences: preferences)
+                }
+            }
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .tint(.yellow)
+            .task { await model.start() }
+            .onDisappear { model.stop() }
         }
-        .tint(.yellow)
-        .task { await model.start() }
-        .onDisappear { model.stop() }
     }
 
     /// The metering HUD floated over the preview near the bottom edge: the scene

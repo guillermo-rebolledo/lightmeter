@@ -36,9 +36,16 @@ final class MeterViewModel {
     /// The most recent raw metadata sample, or `nil` before the first reading.
     private(set) var latestReading: LightReading?
 
-    /// The most recent scene exposure value at ISO 100, or `nil` before the first
-    /// reading.
-    private(set) var ev: Double?
+    /// The calibrated scene exposure value at ISO 100, or `nil` before the first
+    /// reading. Changing calibration updates the current reading immediately.
+    var ev: Double? {
+        rawEV.map {
+            ExposureEngine.calibratedEV(
+                evAtISO100: $0,
+                calibrationOffset: preferences.calibrationOffset
+            )
+        }
+    }
 
     /// Whether the current reading is held while incoming source emissions are
     /// ignored. A reading must exist before the meter can be frozen.
@@ -74,6 +81,7 @@ final class MeterViewModel {
             mode: mode,
             evAtISO100: ev,
             compensation: compensation,
+            increment: preferences.increment,
             iso: iso,
             aperture: aperture,
             shutter: shutter
@@ -86,6 +94,7 @@ final class MeterViewModel {
             mode: mode,
             evAtISO100: ev,
             compensation: compensation,
+            increment: preferences.increment,
             iso: iso,
             aperture: aperture,
             shutter: shutter
@@ -117,10 +126,17 @@ final class MeterViewModel {
     private(set) var spot: CGPoint?
 
     private let source: LightSource
+    private let preferences: MeterPreferences
+    private var rawEV: Double?
     private var meteringTask: Task<Void, Never>?
 
-    init(source: LightSource) {
+    convenience init(source: LightSource) {
+        self.init(source: source, preferences: MeterPreferences(defaults: nil))
+    }
+
+    init(source: LightSource, preferences: MeterPreferences) {
         self.source = source
+        self.preferences = preferences
     }
 
     /// Requests camera access and, if granted, begins metering. On denial the
@@ -151,7 +167,7 @@ final class MeterViewModel {
                     guard self.isFrozen == false else { continue }
                     guard let ev = ExposureEngine.evAtISO100(for: reading) else { continue }
                     self.latestReading = reading
-                    self.ev = ev
+                    self.rawEV = ev
                 }
                 // The stream can finish on its own — e.g. capture configuration
                 // fails because no camera is available. Reset status so the UI
@@ -303,14 +319,14 @@ final class MeterViewModel {
     /// The dial-able stops of the bound leg's scale, or empty when nothing is
     /// bound — what the arc dial lays out as its detents.
     var boundStops: [PhotographicScale.Stop] {
-        boundComponent?.scale.stops ?? []
+        boundComponent?.scale(for: preferences.increment).stops ?? []
     }
 
     /// The index within `boundStops` of the bound leg's current value, or `nil`
     /// when nothing is bound — the stop the dial's fixed indicator points at.
     var boundStopIndex: Int? {
         guard let boundComponent else { return nil }
-        let scale = boundComponent.scale
+        let scale = boundComponent.scale(for: preferences.increment)
         return scale.stops.firstIndex(of: scale.snap(value(for: boundComponent)))
     }
 
@@ -318,7 +334,7 @@ final class MeterViewModel {
     var dialLabels: [String] {
         switch dialTarget {
         case let .component(component):
-            component.scale.stops.map(\.label)
+            component.scale(for: preferences.increment).stops.map(\.label)
         case .compensation:
             Self.compensationStops.map(Self.compensationDialLabel)
         case nil:
@@ -359,7 +375,7 @@ final class MeterViewModel {
     /// scale), re-solving the triangle live. No-op when nothing is bound.
     func setBoundStopIndex(_ index: Int) {
         guard let boundComponent else { return }
-        let stops = boundComponent.scale.stops
+        let stops = boundComponent.scale(for: preferences.increment).stops
         let value = stops[min(max(index, 0), stops.count - 1)].value
         switch boundComponent {
         case .iso: iso = value
