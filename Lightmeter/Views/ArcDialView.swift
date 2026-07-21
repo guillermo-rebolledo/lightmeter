@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// A Halide-style curved dial hugging the bottom edge: the scale's stops fan
 /// along an arc and sweep horizontally past a fixed indicator as you drag. Each
@@ -27,8 +28,14 @@ struct ArcDialView: View {
     @State private var dragPosition: CGFloat?
     /// The `selectedIndex` captured when the current drag began.
     @State private var dragAnchorIndex = 0
-    /// The last stop reported during this drag — the haptic/`onSelect` trigger.
+    /// The last stop reported during the current drag. Reset to `selectedIndex`
+    /// when a drag begins so a freshly bound (or externally changed) dial never
+    /// emits a phantom detent on its first movement.
     @State private var committedIndex = 0
+    /// Fires the mechanical detent tick. Driven imperatively so a fast flick that
+    /// sweeps several stops in one gesture update ticks once *per* stop crossed —
+    /// which SwiftUI's edge-triggered `.sensoryFeedback` can't express.
+    @State private var haptics = UISelectionFeedbackGenerator()
 
     // Arc geometry. A large radius keeps the arc gently curved rather than a
     // tight bowl; `anglePerStop` sets how far apart the marks fan.
@@ -43,7 +50,6 @@ struct ArcDialView: View {
     /// The effective dial position: the live drag while dragging, else the
     /// committed selection.
     private var position: CGFloat { dragPosition ?? CGFloat(selectedIndex) }
-    private var isDragging: Bool { dragPosition != nil }
 
     var body: some View {
         GeometryReader { geo in
@@ -68,11 +74,6 @@ struct ArcDialView: View {
         .frame(height: 150)
         .contentShape(Rectangle())
         .gesture(dialGesture)
-        .sensoryFeedback(trigger: committedIndex) { _, _ in
-            // A detent tick only while the photographer is turning the dial.
-            isDragging ? .selection : nil
-        }
-        .onAppear { committedIndex = selectedIndex }
         .accessibilityElement()
         .accessibilityLabel(caption)
         .accessibilityValue(stops[safe: selectedIndex]?.label ?? "")
@@ -139,7 +140,14 @@ struct ArcDialView: View {
     private var dialGesture: some Gesture {
         DragGesture(minimumDistance: 1)
             .onChanged { value in
-                if dragPosition == nil { dragAnchorIndex = selectedIndex }
+                // Drag begins: anchor to the current selection so the first
+                // movement is measured from — and ticks relative to — where the
+                // dial actually sits, not a stale index from a prior binding.
+                if dragPosition == nil {
+                    dragAnchorIndex = selectedIndex
+                    committedIndex = selectedIndex
+                    haptics.prepare()
+                }
 
                 // Dragging left advances toward higher values; one `pointsPerStop`
                 // of travel is one stop.
@@ -148,10 +156,16 @@ struct ArcDialView: View {
                 dragPosition = clamped
 
                 let rounded = Int(clamped.rounded())
-                if rounded != committedIndex {
-                    committedIndex = rounded
-                    onSelect(rounded)
+                guard rounded != committedIndex else { return }
+
+                // A tick per stop actually crossed, so a fast flick over several
+                // stops feels like several detents, not one.
+                for _ in 0..<abs(rounded - committedIndex) {
+                    haptics.selectionChanged()
                 }
+                haptics.prepare()
+                committedIndex = rounded
+                onSelect(rounded)
             }
             .onEnded { _ in
                 // Every crossing was already reported in `onChanged`; just settle
