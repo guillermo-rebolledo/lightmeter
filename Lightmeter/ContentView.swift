@@ -61,17 +61,6 @@ struct ContentView: View {
                     }
                 }
             }
-            // Toolbar items live in the 44pt nav-bar band above content. Anchor a
-            // matching proxy there so the spotlight can resolve in content space.
-            .overlay(alignment: .topTrailing) {
-                Color.clear
-                    .frame(width: 44, height: 44)
-                    .guidedTourAnchor(.settings)
-                    .padding(.trailing, 8)
-                    .offset(y: -44)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            }
             // Resolve tour anchors in the same full-screen space the spotlight
             // draws into. An outer overlay under-reports Y by the top safe area,
             // which shifts every cutout upward by roughly one control row.
@@ -79,10 +68,14 @@ struct ContentView: View {
                 GeometryReader { geometry in
                     if tour.isPresented,
                        let step = tour.currentStep,
-                       let anchor = anchors[step] {
+                       let targetFrame = tourTargetFrame(
+                        for: step,
+                        anchors: anchors,
+                        geometry: geometry
+                       ) {
                         GuidedTourOverlay(
                             step: step,
-                            targetFrame: geometry[anchor],
+                            targetFrame: targetFrame,
                             progressLabel: tour.progressLabel,
                             onAdvance: tour.advance,
                             onSkip: tour.skip
@@ -228,6 +221,29 @@ struct ContentView: View {
             }
         } else {
             tourAdvisories = nil
+        }
+    }
+
+    /// Toolbar items don't publish reliable content-space anchors, so Settings
+    /// is synthesized to the standard trailing nav-bar button slot.
+    private func tourTargetFrame(
+        for step: GuidedTourStep,
+        anchors: [GuidedTourStep: Anchor<CGRect>],
+        geometry: GeometryProxy
+    ) -> CGRect? {
+        switch step {
+        case .settings:
+            let size = 44.0
+            let trailing = 16.0
+            return CGRect(
+                x: geometry.size.width - trailing - size,
+                y: max(geometry.safeAreaInsets.top - size, 0),
+                width: size,
+                height: size
+            )
+        case .evReadout, .meteringPattern, .priorityAndChips, .arcDial, .compensation:
+            guard let anchor = anchors[step] else { return nil }
+            return geometry[anchor]
         }
     }
 }

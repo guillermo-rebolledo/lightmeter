@@ -8,10 +8,14 @@ struct GuidedTourOverlay: View {
     let onSkip: () -> Void
 
     var body: some View {
-        let spotlightFrame = targetFrame.insetBy(dx: -10, dy: -8)
+        let padding = step == .settings
+            ? CGSize(width: 6, height: 6)
+            : CGSize(width: 10, height: 8)
+        let spotlightFrame = targetFrame.insetBy(dx: -padding.width, dy: -padding.height)
+        let cornerRadius = step == .settings ? 12.0 : 16.0
 
         ZStack {
-            SpotlightShape(targetFrame: spotlightFrame, cornerRadius: 16)
+            SpotlightShape(targetFrame: spotlightFrame, cornerRadius: cornerRadius)
                 .fill(
                     .black.opacity(0.72),
                     style: FillStyle(eoFill: true)
