@@ -5,6 +5,7 @@ import UIKit
 /// EV@ISO100 read out over it and updating in real time. Falls back to a graceful
 /// denied state when camera access isn't granted.
 struct ContentView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var camera: CameraLightSource
     @State private var model: MeterViewModel
 
@@ -33,18 +34,44 @@ struct ContentView: View {
     }
 
     /// The metering HUD floated over the preview near the bottom edge: the scene
-    /// EV@ISO100 reference above the three exposure-triangle chips.
+    /// EV@ISO100 reference above the three exposure-triangle chips, with the arc
+    /// dial swinging in below when a chip is bound.
     private var meterOverlay: some View {
-        VStack {
+        VStack(spacing: 0) {
             Spacer()
             VStack(spacing: 16) {
                 evReadout
-                ExposureChipsView(triangle: model.triangle)
+                ExposureChipsView(
+                    triangle: model.triangle,
+                    boundComponent: model.boundComponent,
+                    onSelect: { model.bindDial(to: $0) }
+                )
             }
             .padding(20)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
             .padding(.horizontal, 16)
-            .padding(.bottom, 44)
+
+            dial
+                .padding(.top, 8)
+        }
+        .padding(.bottom, 44)
+        .animation(reduceMotion ? nil : .snappy, value: model.boundComponent)
+    }
+
+    /// The arc dial, shown only while a chip is bound. It drives the bound leg by
+    /// stop index and re-solves the triangle live.
+    @ViewBuilder
+    private var dial: some View {
+        if let boundComponent = model.boundComponent, let index = model.boundStopIndex {
+            ArcDialView(
+                stops: model.boundStops,
+                selectedIndex: index,
+                caption: boundComponent.caption,
+                onSelect: { model.setBoundStopIndex($0) }
+            )
+            .transition(reduceMotion
+                ? .opacity
+                : .move(edge: .bottom).combined(with: .opacity))
         }
     }
 

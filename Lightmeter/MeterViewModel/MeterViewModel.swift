@@ -54,6 +54,11 @@ final class MeterViewModel {
         ExposureEngine.solvedTriangle(evAtISO100: ev, iso: iso, aperture: aperture)
     }
 
+    /// Which chip's leg the single arc dial is bound to, or `nil` when no dial is
+    /// active. Only an editable (set, not solved) leg can be bound, and only one
+    /// at a time — binding a new leg replaces the old.
+    private(set) var boundComponent: ExposureComponent?
+
     private let source: LightSource
     private var meteringTask: Task<Void, Never>?
 
@@ -109,7 +114,7 @@ final class MeterViewModel {
     }
 
     /// Sets the photographer's ISO. The triangle re-solves the shutter from the
-    /// new value on the next read. (The dial that drives this lands in #5.)
+    /// new value on the next read.
     func setISO(_ value: Double) {
         iso = value
     }
@@ -118,5 +123,58 @@ final class MeterViewModel {
     /// The triangle re-solves the shutter from the new value on the next read.
     func setAperture(_ value: Double) {
         aperture = value
+    }
+
+    // MARK: - Dial binding
+
+    /// Whether `component` is an editable (set, not solved) leg the arc dial can
+    /// drive. The solved leg is computed and non-editable, so it can't be bound.
+    func isEditable(_ component: ExposureComponent) -> Bool {
+        component != triangle.solved
+    }
+
+    /// Binds the arc dial to `component`'s chip, or unbinds if it is already the
+    /// bound leg (tap to toggle). Non-editable (solved) legs are ignored. Only
+    /// one leg is ever bound — binding a new one replaces the old.
+    func bindDial(to component: ExposureComponent) {
+        guard isEditable(component) else { return }
+        boundComponent = (boundComponent == component) ? nil : component
+    }
+
+    /// The dial-able stops of the bound leg's scale, or empty when nothing is
+    /// bound — what the arc dial lays out as its detents.
+    var boundStops: [PhotographicScale.Stop] {
+        boundComponent?.scale.stops ?? []
+    }
+
+    /// The index within `boundStops` of the bound leg's current value, or `nil`
+    /// when nothing is bound — the stop the dial's fixed indicator points at.
+    var boundStopIndex: Int? {
+        guard let boundComponent, let value = value(for: boundComponent) else { return nil }
+        let scale = boundComponent.scale
+        return scale.stops.firstIndex(of: scale.snap(value))
+    }
+
+    /// Drives the dial: sets the bound leg to the stop at `index` (clamped to the
+    /// scale), re-solving the triangle live. No-op when nothing is bound.
+    func setBoundStopIndex(_ index: Int) {
+        guard let boundComponent else { return }
+        let stops = boundComponent.scale.stops
+        let value = stops[min(max(index, 0), stops.count - 1)].value
+        switch boundComponent {
+        case .iso: iso = value
+        case .aperture: aperture = value
+        case .shutter: break // never bound in v1 (solved leg)
+        }
+    }
+
+    /// The current set value of a leg, or `nil` for the solved leg (which the
+    /// dial never drives).
+    private func value(for component: ExposureComponent) -> Double? {
+        switch component {
+        case .iso: return iso
+        case .aperture: return aperture
+        case .shutter: return nil
+        }
     }
 }
