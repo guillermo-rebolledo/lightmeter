@@ -7,10 +7,10 @@ import Foundation
 // computed value to its nearest stop is what makes a solved exposure dial-able:
 // the app never tells you "1/137 s", it tells you "1/125", a click you can set.
 //
-// Stops are spaced one increment apart (1/3 stop in v1). The marked value is the
-// nominal one printed on the dial (f/11, not 11.31; 1/125 s, not 1/128), so
-// snapping is done in stop-space (log2) where the spacing is uniform, not in
-// linear value-space where it is not.
+// Stops are spaced at the selected increment. The marked value is the nominal
+// one printed on the dial (f/11, not 11.31; 1/125 s, not 1/128), so snapping is
+// done in stop-space (log2) where the spacing is uniform, not in linear
+// value-space where it is not.
 
 /// A standard photographic scale of dial-able stops, able to snap an arbitrary
 /// value to the nearest real stop.
@@ -42,9 +42,21 @@ struct PhotographicScale: Sendable {
     }
 }
 
-// MARK: - Standard 1/3-stop scales
+// MARK: - Standard photographic scales
 
 extension PhotographicScale {
+    static func iso(for increment: StopIncrement) -> PhotographicScale {
+        scale(for: increment, third: iso, half: isoHalf, full: isoFull)
+    }
+
+    static func aperture(for increment: StopIncrement) -> PhotographicScale {
+        scale(for: increment, third: aperture, half: apertureHalf, full: apertureFull)
+    }
+
+    static func shutter(for increment: StopIncrement) -> PhotographicScale {
+        scale(for: increment, third: shutter, half: shutterHalf, full: shutterFull)
+    }
+
     /// Standard 1/3-stop ISO sensitivities, ISO 25–25600.
     static let iso = PhotographicScale(
         stops: [
@@ -87,6 +99,64 @@ extension PhotographicScale {
             ]
             + seconds([1, 1.3, 1.6, 2, 2.5, 3, 4, 5, 6, 8, 10, 13, 15, 20, 25, 30])
     )
+
+    private static let isoHalf = PhotographicScale(
+        stops: [
+            25, 35, 50, 70, 100, 140, 200, 280, 400, 560,
+            800, 1100, 1600, 2200, 3200, 4500, 6400, 9000,
+            12800, 18000, 25600,
+        ].map { Stop(value: $0, label: String(Int($0))) }
+    )
+
+    private static let isoFull = PhotographicScale(
+        stops: [
+            25, 50, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600,
+        ].map { Stop(value: $0, label: String(Int($0))) }
+    )
+
+    private static let apertureHalf = PhotographicScale(
+        stops: [
+            1, 1.2, 1.4, 1.7, 2, 2.4, 2.8, 3.3, 4, 4.8, 5.6,
+            6.7, 8, 9.5, 11, 13, 16, 19, 22, 27, 32,
+        ].map { Stop(value: $0, label: trimmedNumber($0)) }
+    )
+
+    private static let apertureFull = PhotographicScale(
+        stops: [
+            1, 1.4, 2, 2.8, 4, 5.6, 8, 11, 16, 22, 32,
+        ].map { Stop(value: $0, label: trimmedNumber($0)) }
+    )
+
+    private static let shutterHalf = PhotographicScale(
+        stops: fractional([
+            8000, 6000, 4000, 3000, 2000, 1500, 1000, 750, 500,
+            350, 250, 180, 125, 90, 60, 45, 30, 20, 15, 10, 8, 6, 4, 3, 2,
+        ])
+            + [
+                Stop(value: 0.7, label: "0.7\""),
+            ]
+            + seconds([1, 1.5, 2, 3, 4, 6, 8, 12, 15, 20, 30])
+    )
+
+    private static let shutterFull = PhotographicScale(
+        stops: fractional([
+            8000, 4000, 2000, 1000, 500, 250, 125, 60, 30, 15, 8, 4, 2,
+        ])
+            + seconds([1, 2, 4, 8, 15, 30])
+    )
+
+    private static func scale(
+        for increment: StopIncrement,
+        third: PhotographicScale,
+        half: PhotographicScale,
+        full: PhotographicScale
+    ) -> PhotographicScale {
+        switch increment {
+        case .third: third
+        case .half: half
+        case .full: full
+        }
+    }
 
     /// Sub-second shutter stops from their reciprocal denominators, `1/N`.
     private static func fractional(_ denominators: [Double]) -> [Stop] {
