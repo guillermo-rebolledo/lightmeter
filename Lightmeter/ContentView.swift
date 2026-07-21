@@ -105,27 +105,17 @@ struct ContentView: View {
                 .padding(.top, 8)
         }
         .padding(.bottom, 44)
-        .animation(reduceMotion ? nil : .snappy, value: model.dialCaption)
     }
 
-    /// The shared arc dial slot. Its height is reserved even when no target is
-    /// bound so showing or hiding the dial never shifts the controls above it.
-    @ViewBuilder
+    /// The shared arc dial stays mounted so its gesture area is available before
+    /// a target is bound; only its visual content changes visibility.
     private var dial: some View {
-        Group {
-            if let index = model.dialStopIndex, let caption = model.dialCaption {
-                ArcDialView(
-                    labels: model.dialLabels,
-                    selectedIndex: index,
-                    caption: caption,
-                    onSelect: { model.setDialStopIndex($0) }
-                )
-                .transition(reduceMotion
-                    ? .opacity
-                    : .move(edge: .bottom).combined(with: .opacity))
-            }
-        }
-        .frame(height: ArcDialView.layoutHeight)
+        ArcDialView(
+            labels: model.dialLabels,
+            selectedIndex: model.dialStopIndex,
+            caption: model.dialCaption,
+            onSelect: { model.setDialStopIndex($0) }
+        )
     }
 
     /// The EV@ISO100 readout — the raw reference for the scene's light level.
