@@ -12,6 +12,9 @@ import UIKit
 /// A drag is expressed in continuous stop-units and rounded to the nearest stop,
 /// so the same gesture drives both the visual sweep and the reported value.
 struct ArcDialView: View {
+    /// The vertical space the dial requires, including its marks and gesture area.
+    static let layoutHeight: CGFloat = 150
+
     /// The detent labels laid out along the arc.
     let labels: [String]
     /// The stop the fixed indicator currently points at.
@@ -71,7 +74,7 @@ struct ArcDialView: View {
 
             indicator.position(x: centerX, y: 8)
         }
-        .frame(height: 150)
+        .frame(height: Self.layoutHeight)
         .contentShape(Rectangle())
         .gesture(dialGesture)
         .accessibilityElement()

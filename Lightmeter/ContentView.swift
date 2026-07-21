@@ -63,8 +63,8 @@ struct ContentView: View {
     }
 
     /// The metering HUD floated over the preview near the bottom edge: the scene
-    /// EV@ISO100 reference above the three exposure-triangle chips, with the arc
-    /// dial swinging in below when a chip is bound.
+    /// EV@ISO100 reference above the three exposure-triangle chips, with a
+    /// permanent slot for the arc dial below them.
     private var meterOverlay: some View {
         VStack(spacing: 0) {
             Spacer()
@@ -108,21 +108,24 @@ struct ContentView: View {
         .animation(reduceMotion ? nil : .snappy, value: model.dialCaption)
     }
 
-    /// The shared arc dial, shown while an exposure chip or EV compensation is
-    /// bound. It drives that target by detent index and re-solves live.
+    /// The shared arc dial slot. Its height is reserved even when no target is
+    /// bound so showing or hiding the dial never shifts the controls above it.
     @ViewBuilder
     private var dial: some View {
-        if let index = model.dialStopIndex, let caption = model.dialCaption {
-            ArcDialView(
-                labels: model.dialLabels,
-                selectedIndex: index,
-                caption: caption,
-                onSelect: { model.setDialStopIndex($0) }
-            )
-            .transition(reduceMotion
-                ? .opacity
-                : .move(edge: .bottom).combined(with: .opacity))
+        Group {
+            if let index = model.dialStopIndex, let caption = model.dialCaption {
+                ArcDialView(
+                    labels: model.dialLabels,
+                    selectedIndex: index,
+                    caption: caption,
+                    onSelect: { model.setDialStopIndex($0) }
+                )
+                .transition(reduceMotion
+                    ? .opacity
+                    : .move(edge: .bottom).combined(with: .opacity))
+            }
         }
+        .frame(height: ArcDialView.layoutHeight)
     }
 
     /// The EV@ISO100 readout — the raw reference for the scene's light level.
