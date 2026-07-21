@@ -12,10 +12,12 @@ struct MeterPreferencesTests {
         let preferences = MeterPreferences(defaults: defaults)
         preferences.increment = .full
         preferences.calibrationOffset = 1.0 / 3
+        preferences.hasSeenGuidedTour = true
 
         let restored = MeterPreferences(defaults: defaults)
 
         #expect(restored.increment == .full)
         #expect(abs(restored.calibrationOffset - (1.0 / 3)) < 1e-12)
+        #expect(restored.hasSeenGuidedTour)
     }
 }

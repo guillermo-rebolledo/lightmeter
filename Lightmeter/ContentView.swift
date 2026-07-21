@@ -9,9 +9,12 @@ struct ContentView: View {
     }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var isVoiceOverRunning
     @State private var camera: CameraLightSource
     @State private var model: MeterViewModel
     @State private var preferences: MeterPreferences
+    @State private var tour: GuidedTourController
+    @State private var path: [Destination] = []
 
     init(defaults: UserDefaults = .standard) {
         let camera = CameraLightSource()
@@ -19,10 +22,11 @@ struct ContentView: View {
         _camera = State(initialValue: camera)
         _model = State(initialValue: MeterViewModel(source: camera, preferences: preferences))
         _preferences = State(initialValue: preferences)
+        _tour = State(initialValue: GuidedTourController(preferences: preferences))
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ZStack {
                 Color.black.ignoresSafeArea()
 
@@ -52,13 +56,40 @@ struct ContentView: View {
             .navigationDestination(for: Destination.self) { destination in
                 switch destination {
                 case .settings:
-                    SettingsView(preferences: preferences)
+                    SettingsView(
+                        preferences: preferences,
+                        onShowTour: showTour
+                    )
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
             .tint(.yellow)
             .task { await model.start() }
             .onDisappear { model.stop() }
+        }
+        .overlayPreferenceValue(GuidedTourAnchorPreferenceKey.self) { anchors in
+            GeometryReader { geometry in
+                if tour.isPresented,
+                   let step = tour.currentStep,
+                   let anchor = anchors[step] {
+                    GuidedTourOverlay(
+                        step: step,
+                        targetFrame: geometry[anchor],
+                        progressLabel: tour.progressLabel,
+                        onAdvance: tour.advance,
+                        onSkip: tour.skip
+                    )
+                }
+            }
+        }
+        .onChange(of: model.status, initial: true) {
+            updateTourState()
+        }
+        .onChange(of: model.latestReading) {
+            updateTourState()
+        }
+        .onChange(of: isVoiceOverRunning, initial: true) {
+            updateTourState()
         }
     }
 
@@ -134,6 +165,26 @@ struct ContentView: View {
                 .contentTransition(.numericText())
         }
         .animation(reduceMotion ? nil : .snappy, value: model.ev)
+        .guidedTourAnchor(.evReadout)
+    }
+
+    private func showTour() {
+        tour.requestReplay(
+            for: model.status,
+            isMeterReady: model.latestReading != nil,
+            isVoiceOverRunning: isVoiceOverRunning
+        )
+        if path.isEmpty == false {
+            path.removeLast()
+        }
+    }
+
+    private func updateTourState() {
+        tour.update(
+            for: model.status,
+            isMeterReady: model.latestReading != nil,
+            isVoiceOverRunning: isVoiceOverRunning
+        )
     }
 }
 
