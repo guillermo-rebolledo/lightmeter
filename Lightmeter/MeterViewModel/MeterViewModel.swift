@@ -62,6 +62,10 @@ final class MeterViewModel {
     /// instead — in aperture-priority.
     private(set) var shutter: Double = 1.0 / 125
 
+    /// Deliberate exposure bias in stops. Positive values ask the solve for more
+    /// exposure; negative values ask for less.
+    private(set) var compensation: Double = 0
+
     /// The exposure triangle for the current scene: the two legs the
     /// photographer set plus the solved leg, each snapped to a real, dial-able
     /// stop. The solved leg is `nil` until the scene has been metered.
@@ -69,6 +73,7 @@ final class MeterViewModel {
         ExposureEngine.solvedTriangle(
             mode: mode,
             evAtISO100: ev,
+            compensation: compensation,
             iso: iso,
             aperture: aperture,
             shutter: shutter
@@ -80,16 +85,28 @@ final class MeterViewModel {
         ExposureEngine.advisories(
             mode: mode,
             evAtISO100: ev,
+            compensation: compensation,
             iso: iso,
             aperture: aperture,
             shutter: shutter
         )
     }
 
-    /// Which chip's leg the single arc dial is bound to, or `nil` when no dial is
-    /// active. Only an editable (set, not solved) leg can be bound, and only one
-    /// at a time — binding a new leg replaces the old.
-    private(set) var boundComponent: ExposureComponent?
+    /// The current owner of the single arc dial. Binding any other control
+    /// replaces it, so exposure chips and compensation can never both be active.
+    private var dialTarget: DialTarget?
+
+    /// Which exposure chip is bound, or `nil` when compensation or no control
+    /// owns the dial.
+    var boundComponent: ExposureComponent? {
+        guard case let .component(component) = dialTarget else { return nil }
+        return component
+    }
+
+    /// Whether the main compensation control currently owns the arc dial.
+    var isCompensationDialBound: Bool {
+        dialTarget == .compensation
+    }
 
     /// How the frame is metered: center-weighted whole-frame average (the
     /// default) or a tap-placed spot.
@@ -183,6 +200,12 @@ final class MeterViewModel {
         shutter = value
     }
 
+    /// Sets deliberate exposure compensation, clamped to the main control's
+    /// ±3-stop range. Updating it immediately re-solves the current triangle.
+    func setCompensation(_ value: Double) {
+        compensation = min(max(value, -3), 3)
+    }
+
     // MARK: - Priority mode
 
     /// Switches the active priority mode. If the arc dial was bound to the leg
@@ -191,7 +214,7 @@ final class MeterViewModel {
     func setMode(_ newMode: PriorityMode) {
         mode = newMode
         if boundComponent == newMode.solvedComponent {
-            boundComponent = nil
+            dialTarget = nil
         }
     }
 
@@ -267,7 +290,14 @@ final class MeterViewModel {
     /// one leg is ever bound — binding a new one replaces the old.
     func bindDial(to component: ExposureComponent) {
         guard isEditable(component) else { return }
-        boundComponent = (boundComponent == component) ? nil : component
+        let target = DialTarget.component(component)
+        dialTarget = (dialTarget == target) ? nil : target
+    }
+
+    /// Binds the shared arc dial to EV compensation, or unbinds it when already
+    /// active. This replaces any exposure-chip binding.
+    func bindCompensationDial() {
+        dialTarget = isCompensationDialBound ? nil : .compensation
     }
 
     /// The dial-able stops of the bound leg's scale, or empty when nothing is
@@ -284,6 +314,47 @@ final class MeterViewModel {
         return scale.stops.firstIndex(of: scale.snap(value(for: boundComponent)))
     }
 
+    /// The labels drawn on the shared dial for its current target.
+    var dialLabels: [String] {
+        switch dialTarget {
+        case let .component(component):
+            component.scale.stops.map(\.label)
+        case .compensation:
+            Self.compensationStops.map(Self.compensationDialLabel)
+        case nil:
+            []
+        }
+    }
+
+    /// The current detent index for whichever control owns the shared dial.
+    var dialStopIndex: Int? {
+        switch dialTarget {
+        case .component:
+            boundStopIndex
+        case .compensation:
+            Self.compensationStops.indices.min {
+                abs(Self.compensationStops[$0] - compensation)
+                    < abs(Self.compensationStops[$1] - compensation)
+            }
+        case nil:
+            nil
+        }
+    }
+
+    /// The VoiceOver caption for the active shared-dial target.
+    var dialCaption: String? {
+        switch dialTarget {
+        case let .component(component): component.caption
+        case .compensation: "EV compensation"
+        case nil: nil
+        }
+    }
+
+    /// The signed compensation shown on the main control.
+    var compensationLabel: String {
+        Self.compensationLabel(compensation)
+    }
+
     /// Drives the dial: sets the bound leg to the stop at `index` (clamped to the
     /// scale), re-solving the triangle live. No-op when nothing is bound.
     func setBoundStopIndex(_ index: Int) {
@@ -297,6 +368,19 @@ final class MeterViewModel {
         }
     }
 
+    /// Drives whichever control owns the shared dial, clamping to its detents.
+    func setDialStopIndex(_ index: Int) {
+        switch dialTarget {
+        case .component:
+            setBoundStopIndex(index)
+        case .compensation:
+            let clampedIndex = min(max(index, 0), Self.compensationStops.count - 1)
+            setCompensation(Self.compensationStops[clampedIndex])
+        case nil:
+            break
+        }
+    }
+
     /// The current set value of a leg — its live stored input. The dial is only
     /// ever bound to an editable (set) leg, so this is always the value it drives.
     private func value(for component: ExposureComponent) -> Double {
@@ -305,5 +389,20 @@ final class MeterViewModel {
         case .aperture: return aperture
         case .shutter: return shutter
         }
+    }
+
+    /// ±3 EV in one-third-stop detents, matching the default photographic scales.
+    private static let compensationStops = (-9...9).map { Double($0) / 3 }
+
+    private static func compensationDialLabel(_ value: Double) -> String {
+        value.formatted(
+            .number
+                .sign(strategy: .always())
+                .precision(.fractionLength(1))
+        )
+    }
+
+    private static func compensationLabel(_ value: Double) -> String {
+        "\(compensationDialLabel(value)) EV"
     }
 }

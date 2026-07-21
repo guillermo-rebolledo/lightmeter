@@ -199,6 +199,62 @@ struct ExposureEngineTests {
         #expect(triangle.aperture?.label == "16")
     }
 
+    // MARK: - EV compensation
+
+    /// At fixed ISO and aperture, positive compensation doubles the duration
+    /// toward overexposure while negative compensation halves it.
+    @Test(arguments: [
+        (compensation: 1.0, expectedShutter: "1/60"),
+        (compensation: -1.0, expectedShutter: "1/250"),
+    ])
+    func compensationSignShiftsTheSolveInTheExpectedDirection(
+        _ example: (compensation: Double, expectedShutter: String)
+    ) {
+        let triangle = ExposureEngine.solvedTriangle(
+            mode: .aperturePriority,
+            evAtISO100: 15,
+            compensation: example.compensation,
+            iso: 100,
+            aperture: 16,
+            shutter: 1.0 / 125
+        )
+
+        #expect(triangle.shutter?.label == example.expectedShutter)
+    }
+
+    /// Compensation is additive in stop-space: two successive nudges have the
+    /// same target EV as their sum.
+    @Test func compensationIsAdditive() {
+        let afterFirst = ExposureEngine.targetEV(evAtISO100: 15, compensation: 2.0 / 3)
+        let afterSecond = ExposureEngine.targetEV(evAtISO100: afterFirst, compensation: 1.0 / 3)
+        let combined = ExposureEngine.targetEV(evAtISO100: 15, compensation: 1)
+
+        #expect(abs(afterSecond - combined) < 1e-12)
+    }
+
+    /// Compensation also biases advisory calculations: +1 EV moves the solved
+    /// shutter from the safe 1/60 s edge to 1/30 s, which carries handheld risk.
+    @Test func compensationFlowsIntoAdvisories() {
+        let atHandheldLimit = ExposureEngine.advisories(
+            mode: .aperturePriority,
+            evAtISO100: log2(60),
+            iso: 100,
+            aperture: 1,
+            shutter: 1.0 / 125
+        )
+        let compensated = ExposureEngine.advisories(
+            mode: .aperturePriority,
+            evAtISO100: log2(60),
+            compensation: 1,
+            iso: 100,
+            aperture: 1,
+            shutter: 1.0 / 125
+        )
+
+        #expect(atHandheldLimit.isEmpty)
+        #expect(compensated == [.handheldRisk])
+    }
+
     // MARK: - Advisories
 
     @Test func shutterAdvisoriesRespectThresholdEdges() {
