@@ -27,6 +27,32 @@ struct ExposureEngineTests {
         #expect(abs((base - doubled) - 1) < 0.001)
     }
 
+    /// A valid reading converts through the failable overload to the same EV as
+    /// the primitive form (Sunny 16 → EV 15).
+    @Test func validReadingConvertsToEV() {
+        let ev = ExposureEngine.evAtISO100(
+            for: LightReading(iso: 100, exposureDuration: 1.0 / 128.0, aperture: 16)
+        )
+        #expect(ev != nil)
+        #expect(abs((ev ?? .nan) - 15) < 0.001)
+    }
+
+    /// Physically impossible readings (non-positive or non-finite legs) are
+    /// rejected so NaN/±infinity can never reach the meter's EV state.
+    @Test(arguments: [
+        LightReading(iso: 0, exposureDuration: 1.0 / 128.0, aperture: 16),
+        LightReading(iso: -100, exposureDuration: 1.0 / 128.0, aperture: 16),
+        LightReading(iso: 100, exposureDuration: 0, aperture: 16),
+        LightReading(iso: 100, exposureDuration: -0.5, aperture: 16),
+        LightReading(iso: 100, exposureDuration: 1.0 / 128.0, aperture: 0),
+        LightReading(iso: .nan, exposureDuration: 1.0 / 128.0, aperture: 16),
+        LightReading(iso: 100, exposureDuration: .infinity, aperture: 16),
+        LightReading(iso: 100, exposureDuration: 1.0 / 128.0, aperture: .nan),
+    ])
+    func rejectsPhysicallyInvalidReadings(_ reading: LightReading) {
+        #expect(ExposureEngine.evAtISO100(for: reading) == nil)
+    }
+
     /// Pins the aperture term: halving N² (f/16 → f/11.3) halves N²/t, so the
     /// computed EV drops by exactly one stop.
     @Test func apertureTermFollowsLog2OfNSquared() {

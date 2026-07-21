@@ -67,6 +67,19 @@ struct MeterViewModelTests {
         #expect(vm.latestReading == dim)
     }
 
+    @Test func statusResetsToIdleWhenStreamFinishesWithoutStop() async {
+        let source = FakeLightSource()
+        let vm = MeterViewModel(source: source)
+        await vm.start()
+        #expect(vm.status == .metering)
+
+        // The source's capture ends on its own (e.g. no camera available).
+        source.finishStream()
+
+        await waitUntil { vm.status == .idle }
+        #expect(vm.status == .idle)
+    }
+
     @Test func deniedAuthorizationShowsDeniedState() async {
         let source = FakeLightSource()
         source.authorization = .denied

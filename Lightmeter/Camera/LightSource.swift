@@ -31,9 +31,11 @@ enum LightSourceAuthorization: Sendable {
 /// `stop()` ends metering and finishes the stream returned by the matching
 /// `start()`.
 ///
-/// `start()` vends a new stream each call rather than exposing one shared stream,
-/// because `AsyncStream` is single-consumer and iterable only once — a stop →
-/// start cycle needs a new stream or the readings never resume.
+/// Each `start()` returns a new stream intended for a single metering session;
+/// callers must not iterate it concurrently or reuse it once it has finished. A
+/// stop → start cycle therefore needs a fresh stream rather than re-iterating a
+/// finished one, which is why readings are vended per-`start()` instead of via one
+/// shared property.
 ///
 /// Deliberately not `@MainActor`: the real camera does its capture work on its own
 /// queues. `MeterViewModel` (which *is* `@MainActor`) consumes the stream and

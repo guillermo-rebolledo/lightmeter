@@ -57,6 +57,9 @@ final class CameraLightSource: NSObject, LightSource {
                 continuation.finish()
                 return
             }
+            // Defensive: if start() is called again without a matching stop(),
+            // finish the prior session's stream so its consumer isn't left hanging.
+            self.activeContinuation?.finish()
             self.activeContinuation = continuation
             sampler.setContinuation(continuation)
             if !self.session.isRunning {

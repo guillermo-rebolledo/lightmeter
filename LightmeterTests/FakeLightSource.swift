@@ -37,4 +37,11 @@ final class FakeLightSource: LightSource {
     func emit(_ reading: LightReading) {
         continuation?.yield(reading)
     }
+
+    /// Finishes the current stream without going through `stop()`, simulating a
+    /// source whose capture ends on its own (e.g. no camera available).
+    func finishStream() {
+        continuation?.finish()
+        continuation = nil
+    }
 }

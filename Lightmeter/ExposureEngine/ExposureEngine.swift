@@ -25,15 +25,29 @@ enum ExposureEngine {
     ///   - exposureDuration: The exposure duration in seconds (e.g. `1.0/128`).
     ///   - aperture: The lens f-number `N` (e.g. 1.8, 16).
     /// - Returns: The scene exposure value at ISO 100.
+    /// - Precondition: `iso`, `exposureDuration`, and `aperture` must all be
+    ///   positive and finite. The `log2` terms produce NaN/±infinity otherwise;
+    ///   use `evAtISO100(for:)` at the camera boundary to reject such readings.
     static func evAtISO100(iso: Double, exposureDuration: Double, aperture: Double) -> Double {
         let apertureTerm = log2((aperture * aperture) / exposureDuration)
         let isoTerm = log2(iso / 100)
         return apertureTerm - isoTerm
     }
 
-    /// Convenience overload converting a raw `LightReading` sample straight to EV@ISO100.
-    static func evAtISO100(for reading: LightReading) -> Double {
-        evAtISO100(
+    /// Converts a raw `LightReading` sample to EV@ISO100, rejecting physically
+    /// impossible readings (non-positive or non-finite ISO, duration, or
+    /// aperture) so NaN/±infinity can never reach the meter's EV state.
+    ///
+    /// - Returns: The scene EV@ISO100, or `nil` if the reading is invalid.
+    static func evAtISO100(for reading: LightReading) -> Double? {
+        guard
+            reading.iso > 0, reading.iso.isFinite,
+            reading.exposureDuration > 0, reading.exposureDuration.isFinite,
+            reading.aperture > 0, reading.aperture.isFinite
+        else {
+            return nil
+        }
+        return evAtISO100(
             iso: reading.iso,
             exposureDuration: reading.exposureDuration,
             aperture: reading.aperture

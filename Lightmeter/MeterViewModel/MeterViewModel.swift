@@ -55,6 +55,11 @@ final class MeterViewModel {
         case .denied:
             status = .denied
         case .authorized:
+            // The permission prompt is a suspension point. If the view went away
+            // while we were waiting (its `.task` was cancelled and `stop()` ran),
+            // don't spin the camera back up.
+            guard !Task.isCancelled else { return }
+
             status = .metering
             let stream = source.start()
             meteringTask = Task { [weak self] in
@@ -63,8 +68,16 @@ final class MeterViewModel {
                     // view-model across suspension points (avoids a retain cycle
                     // via the stored `meteringTask`).
                     guard let self else { break }
+                    guard let ev = ExposureEngine.evAtISO100(for: reading) else { continue }
                     self.latestReading = reading
-                    self.ev = ExposureEngine.evAtISO100(for: reading)
+                    self.ev = ev
+                }
+                // The stream can finish on its own — e.g. capture configuration
+                // fails because no camera is available. Reset status so the UI
+                // doesn't stay stuck on the metering screen and a later start()
+                // isn't blocked by the guard above.
+                if let self, self.status == .metering {
+                    self.status = .idle
                 }
             }
         }
