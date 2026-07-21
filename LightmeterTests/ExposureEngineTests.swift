@@ -61,4 +61,61 @@ struct ExposureEngineTests {
         let fWide = ExposureEngine.evAtISO100(iso: 100, exposureDuration: 1.0 / 128.0, aperture: 16 / 2.0.squareRoot())
         #expect(abs((f16 - fWide) - 1) < 0.001)
     }
+
+    // MARK: - Aperture-priority solve (t = N² / (2^EV100 · ISO/100))
+
+    /// Sunny 16 inverted: EV 15 at ISO 100, f/16 solves to the reference
+    /// exposure 1/128 s (which snaps to the dial mark 1/125).
+    @Test func aperturePrioritySolvesSunny16Shutter() {
+        let raw = ExposureEngine.shutterDuration(evAtISO100: 15, iso: 100, aperture: 16)
+        #expect(abs(raw - 1.0 / 128) < 1e-9)
+    }
+
+    /// Doubling ISO is one stop more sensitive, so the balancing shutter is one
+    /// stop faster (half the duration).
+    @Test func doublingISOHalvesTheSolvedShutter() {
+        let base = ExposureEngine.shutterDuration(evAtISO100: 15, iso: 100, aperture: 16)
+        let faster = ExposureEngine.shutterDuration(evAtISO100: 15, iso: 200, aperture: 16)
+        #expect(abs(base / faster - 2) < 1e-9)
+    }
+
+    /// Opening up two stops (f/16 → f/8, one quarter the N²) lets in four times
+    /// the light, so the balancing shutter is four times faster (one quarter the
+    /// duration).
+    @Test func openingApertureShortensTheSolvedShutter() {
+        let narrow = ExposureEngine.shutterDuration(evAtISO100: 15, iso: 100, aperture: 16)
+        let wide = ExposureEngine.shutterDuration(evAtISO100: 15, iso: 100, aperture: 8)
+        #expect(abs(narrow / wide - 4) < 1e-9)
+    }
+
+    /// A dimmer scene solves to a slower (longer) shutter — the demo behavior:
+    /// the solved shutter tracks the light down.
+    @Test func dimmerSceneSolvesToSlowerShutter() {
+        let bright = ExposureEngine.shutterDuration(evAtISO100: 15, iso: 100, aperture: 8)
+        let dim = ExposureEngine.shutterDuration(evAtISO100: 10, iso: 100, aperture: 8)
+        #expect(dim > bright)
+    }
+
+    // MARK: - solvedTriangle (snapped, solved-leg flagged)
+
+    @Test func solvedTriangleFlagsShutterAndSnapsAllLegs() {
+        let triangle = ExposureEngine.solvedTriangle(evAtISO100: 15, iso: 100, aperture: 16)
+
+        #expect(triangle.solved == .shutter)
+        #expect(triangle.isSolved(.shutter))
+        #expect(!triangle.isSolved(.aperture))
+        #expect(!triangle.isSolved(.iso))
+
+        #expect(triangle.iso.label == "100")
+        #expect(triangle.aperture.label == "16")
+        // 1/128 s solves and snaps to the dial mark 1/125.
+        #expect(triangle.shutter?.label == "1/125")
+    }
+
+    /// Off-scale ISO/aperture inputs are snapped to real stops before solving.
+    @Test func solvedTriangleSnapsOffScaleInputs() {
+        let triangle = ExposureEngine.solvedTriangle(evAtISO100: 15, iso: 430, aperture: 15.5)
+        #expect(triangle.iso.label == "400")
+        #expect(triangle.aperture.label == "16")
+    }
 }
