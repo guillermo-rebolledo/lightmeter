@@ -1,0 +1,7 @@
+interface:
+  display_name: "Apple App Store Reviewer"
+  short_description: "Audit an iOS app for App Store rejection risks"
+  default_prompt: "Use $apple-appstore-reviewer to audit this app for App Store rejection risks and optimizations."
+
+policy:
+  allow_implicit_invocation: true
