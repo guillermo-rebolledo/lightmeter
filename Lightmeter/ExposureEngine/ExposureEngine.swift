@@ -170,7 +170,7 @@ enum ExposureEngine {
             var advisories: [ExposureAdvisory] = []
             if isAtLeast(solvedShutter, threshold: 1.0 / 15) {
                 advisories.append(.tripodRecommended)
-            } else if solvedShutter > 1.0 / 60 {
+            } else if isAtMost(solvedShutter, threshold: 1.0 / 60) == false {
                 advisories.append(.handheldRisk)
             }
             if isWithin(solvedShutter, scale: .shutter) == false {

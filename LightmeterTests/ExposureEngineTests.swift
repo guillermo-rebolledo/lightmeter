@@ -209,6 +209,13 @@ struct ExposureEngineTests {
             aperture: 1,
             shutter: 1.0 / 125
         )
+        let roundOffAboveHandheldLimit = ExposureEngine.advisories(
+            mode: .aperturePriority,
+            evAtISO100: log2(1 / ((1.0 / 60) * (1 + 5e-13))),
+            iso: 100,
+            aperture: 1,
+            shutter: 1.0 / 125
+        )
         let slowerThanHandheldLimit = ExposureEngine.advisories(
             mode: .aperturePriority,
             evAtISO100: log2(50),
@@ -225,6 +232,7 @@ struct ExposureEngineTests {
         )
 
         #expect(atHandheldLimit.isEmpty)
+        #expect(roundOffAboveHandheldLimit.isEmpty)
         #expect(slowerThanHandheldLimit == [.handheldRisk])
         #expect(atTripodThreshold == [.tripodRecommended])
     }
