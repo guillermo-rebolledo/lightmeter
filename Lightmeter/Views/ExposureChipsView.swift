@@ -27,7 +27,7 @@ struct ExposureChipsView: View {
             )
             ValueChip(
                 caption: "Aperture",
-                value: "f/\(triangle.aperture.label)",
+                value: triangle.aperture.map { "f/\($0.label)" } ?? "—",
                 component: .aperture,
                 isSolved: triangle.isSolved(.aperture),
                 isBound: boundComponent == .aperture,
@@ -139,7 +139,9 @@ private struct ValueChip: View {
     ZStack {
         Color.black.ignoresSafeArea()
         ExposureChipsView(
-            triangle: ExposureEngine.solvedTriangle(evAtISO100: 15, iso: 100, aperture: 16),
+            triangle: ExposureEngine.solvedTriangle(
+                mode: .aperturePriority, evAtISO100: 15, iso: 100, aperture: 16, shutter: 1.0 / 125
+            ),
             boundComponent: .aperture,
             onSelect: { _ in }
         )

@@ -39,19 +39,35 @@ final class MeterViewModel {
     /// reading.
     private(set) var ev: Double?
 
+    /// Which leg the photographer holds fixed and which the engine solves.
+    /// Aperture-priority (locks aperture, solves shutter) is the v1 default.
+    private(set) var mode: PriorityMode = .aperturePriority
+
     /// The ISO the photographer has set (their film stock / sensor setting).
-    /// Always an input in v1; drives the aperture-priority solve.
+    /// Always an input; drives the solve in both priority modes.
     private(set) var iso: Double = 100
 
-    /// The aperture the photographer has set. In aperture-priority (v1 default)
-    /// this is the fixed leg and the shutter is solved from it.
+    /// The aperture the photographer has set. A fixed input in aperture-priority
+    /// (the shutter is solved from it); ignored — solved instead — in
+    /// shutter-priority.
     private(set) var aperture: Double = 8
 
+    /// The shutter duration (seconds) the photographer has set. A fixed input in
+    /// shutter-priority (the aperture is solved from it); ignored — solved
+    /// instead — in aperture-priority.
+    private(set) var shutter: Double = 1.0 / 125
+
     /// The exposure triangle for the current scene: the two legs the
-    /// photographer set plus the solved shutter, each snapped to a real,
-    /// dial-able stop. `shutter` is `nil` until the scene has been metered.
+    /// photographer set plus the solved leg, each snapped to a real, dial-able
+    /// stop. The solved leg is `nil` until the scene has been metered.
     var triangle: ExposureTriangle {
-        ExposureEngine.solvedTriangle(evAtISO100: ev, iso: iso, aperture: aperture)
+        ExposureEngine.solvedTriangle(
+            mode: mode,
+            evAtISO100: ev,
+            iso: iso,
+            aperture: aperture,
+            shutter: shutter
+        )
     }
 
     /// Which chip's leg the single arc dial is bound to, or `nil` when no dial is
@@ -113,16 +129,39 @@ final class MeterViewModel {
         }
     }
 
-    /// Sets the photographer's ISO. The triangle re-solves the shutter from the
-    /// new value on the next read.
+    /// Sets the photographer's ISO. The triangle re-solves its solved leg from
+    /// the new value on the next read.
     func setISO(_ value: Double) {
         iso = value
     }
 
     /// Sets the photographer's aperture (the fixed leg in aperture-priority).
-    /// The triangle re-solves the shutter from the new value on the next read.
+    /// The triangle re-solves from the new value on the next read.
     func setAperture(_ value: Double) {
         aperture = value
+    }
+
+    /// Sets the photographer's shutter (the fixed leg in shutter-priority). The
+    /// triangle re-solves from the new value on the next read.
+    func setShutter(_ value: Double) {
+        shutter = value
+    }
+
+    // MARK: - Priority mode
+
+    /// Switches the active priority mode. If the arc dial was bound to the leg
+    /// that becomes solved (and so non-editable) under the new mode, it unbinds
+    /// so the dial never drives a computed leg.
+    func setMode(_ newMode: PriorityMode) {
+        mode = newMode
+        if boundComponent == newMode.solvedComponent {
+            boundComponent = nil
+        }
+    }
+
+    /// Toggles between aperture- and shutter-priority — the single mode control.
+    func toggleMode() {
+        setMode(mode.toggled)
     }
 
     // MARK: - Dial binding
@@ -164,17 +203,17 @@ final class MeterViewModel {
         switch boundComponent {
         case .iso: iso = value
         case .aperture: aperture = value
-        case .shutter: break // never bound in v1 (solved leg)
+        case .shutter: shutter = value
         }
     }
 
-    /// The current set value of a leg, or `nil` for the solved leg (which the
-    /// dial never drives).
+    /// The current set value of a leg. The dial is only ever bound to an editable
+    /// (set) leg, so the value returned for a bound leg is always the live input.
     private func value(for component: ExposureComponent) -> Double? {
         switch component {
         case .iso: return iso
         case .aperture: return aperture
-        case .shutter: return nil
+        case .shutter: return shutter
         }
     }
 }

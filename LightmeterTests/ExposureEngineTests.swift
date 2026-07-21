@@ -96,10 +96,54 @@ struct ExposureEngineTests {
         #expect(dim > bright)
     }
 
+    // MARK: - Shutter-priority solve (N = √(t · 2^EV100 · ISO/100))
+
+    /// Sunny 16 inverted the other way: EV 15 at ISO 100, 1/128 s solves to the
+    /// reference aperture f/16.
+    @Test func shutterPrioritySolvesSunny16Aperture() {
+        let raw = ExposureEngine.apertureFNumber(evAtISO100: 15, iso: 100, shutter: 1.0 / 128)
+        #expect(abs(raw - 16) < 1e-9)
+    }
+
+    /// Doubling ISO is one stop more sensitive, so the balancing aperture stops
+    /// down one stop — N grows by √2.
+    @Test func doublingISOOpensTheSolvedApertureBySqrt2() {
+        let base = ExposureEngine.apertureFNumber(evAtISO100: 15, iso: 100, shutter: 1.0 / 128)
+        let stopped = ExposureEngine.apertureFNumber(evAtISO100: 15, iso: 200, shutter: 1.0 / 128)
+        #expect(abs(stopped / base - 2.0.squareRoot()) < 1e-9)
+    }
+
+    /// A slower (longer) shutter lets in more light, so the balancing aperture
+    /// stops down: four times the duration is two stops, N doubles.
+    @Test func slowerShutterStopsDownTheSolvedAperture() {
+        let fast = ExposureEngine.apertureFNumber(evAtISO100: 15, iso: 100, shutter: 1.0 / 128)
+        let slow = ExposureEngine.apertureFNumber(evAtISO100: 15, iso: 100, shutter: 1.0 / 32)
+        #expect(abs(slow / fast - 2) < 1e-9)
+    }
+
+    /// A dimmer scene solves to a wider (smaller-N) aperture — the shutter-priority
+    /// demo behavior: the solved aperture opens up as the light drops.
+    @Test func dimmerSceneSolvesToWiderAperture() {
+        let bright = ExposureEngine.apertureFNumber(evAtISO100: 15, iso: 100, shutter: 1.0 / 128)
+        let dim = ExposureEngine.apertureFNumber(evAtISO100: 10, iso: 100, shutter: 1.0 / 128)
+        #expect(dim < bright)
+    }
+
+    /// The two solves are inverses: an aperture-priority solve for the shutter,
+    /// fed back as the shutter input, recovers the original aperture.
+    @Test func apertureAndShutterSolvesAreInverses() {
+        let ev = 12.0, iso = 200.0, aperture = 5.6
+        let t = ExposureEngine.shutterDuration(evAtISO100: ev, iso: iso, aperture: aperture)
+        let n = ExposureEngine.apertureFNumber(evAtISO100: ev, iso: iso, shutter: t)
+        #expect(abs(n - aperture) < 1e-9)
+    }
+
     // MARK: - solvedTriangle (snapped, solved-leg flagged)
 
-    @Test func solvedTriangleFlagsShutterAndSnapsAllLegs() {
-        let triangle = ExposureEngine.solvedTriangle(evAtISO100: 15, iso: 100, aperture: 16)
+    @Test func aperturePriorityTriangleFlagsShutterAndSnapsAllLegs() {
+        let triangle = ExposureEngine.solvedTriangle(
+            mode: .aperturePriority, evAtISO100: 15, iso: 100, aperture: 16, shutter: 1.0 / 125
+        )
 
         #expect(triangle.solved == .shutter)
         #expect(triangle.isSolved(.shutter))
@@ -107,15 +151,51 @@ struct ExposureEngineTests {
         #expect(!triangle.isSolved(.iso))
 
         #expect(triangle.iso.label == "100")
-        #expect(triangle.aperture.label == "16")
+        #expect(triangle.aperture?.label == "16")
         // 1/128 s solves and snaps to the dial mark 1/125.
         #expect(triangle.shutter?.label == "1/125")
     }
 
+    /// Shutter-priority flips it: the aperture is now the solved (flagged) leg,
+    /// the shutter is the locked input, and the aperture snaps to a real stop.
+    @Test func shutterPriorityTriangleFlagsApertureAndSnapsAllLegs() {
+        let triangle = ExposureEngine.solvedTriangle(
+            mode: .shutterPriority, evAtISO100: 15, iso: 100, aperture: 16, shutter: 1.0 / 128
+        )
+
+        #expect(triangle.solved == .aperture)
+        #expect(triangle.isSolved(.aperture))
+        #expect(!triangle.isSolved(.shutter))
+        #expect(!triangle.isSolved(.iso))
+
+        #expect(triangle.iso.label == "100")
+        // 1/128 s snaps to the dial mark 1/125; the aperture solves to f/16.
+        #expect(triangle.shutter?.label == "1/125")
+        #expect(triangle.aperture?.label == "16")
+    }
+
+    /// Before metering, the solved leg is pending (`nil`) while the locked legs
+    /// are set — in each mode the opposite leg is the pending one.
+    @Test func solvedTriangleLeavesTheSolvedLegPendingBeforeMetering() {
+        let av = ExposureEngine.solvedTriangle(
+            mode: .aperturePriority, evAtISO100: nil, iso: 100, aperture: 16, shutter: 1.0 / 125
+        )
+        #expect(av.aperture?.label == "16")
+        #expect(av.shutter == nil)
+
+        let tv = ExposureEngine.solvedTriangle(
+            mode: .shutterPriority, evAtISO100: nil, iso: 100, aperture: 16, shutter: 1.0 / 125
+        )
+        #expect(tv.shutter?.label == "1/125")
+        #expect(tv.aperture == nil)
+    }
+
     /// Off-scale ISO/aperture inputs are snapped to real stops before solving.
     @Test func solvedTriangleSnapsOffScaleInputs() {
-        let triangle = ExposureEngine.solvedTriangle(evAtISO100: 15, iso: 430, aperture: 15.5)
+        let triangle = ExposureEngine.solvedTriangle(
+            mode: .aperturePriority, evAtISO100: 15, iso: 430, aperture: 15.5, shutter: 1.0 / 125
+        )
         #expect(triangle.iso.label == "400")
-        #expect(triangle.aperture.label == "16")
+        #expect(triangle.aperture?.label == "16")
     }
 }

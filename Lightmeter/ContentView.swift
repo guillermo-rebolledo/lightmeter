@@ -41,6 +41,10 @@ struct ContentView: View {
             Spacer()
             VStack(spacing: 16) {
                 evReadout
+                PriorityModeToggle(
+                    mode: model.mode,
+                    onSelect: { model.setMode($0) }
+                )
                 ExposureChipsView(
                     triangle: model.triangle,
                     boundComponent: model.boundComponent,

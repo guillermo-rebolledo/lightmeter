@@ -72,30 +72,73 @@ enum ExposureEngine {
         (aperture * aperture) / (pow(2, evAtISO100) * (iso / 100))
     }
 
-    /// Builds the aperture-priority triangle: snaps the photographer's ISO and
-    /// aperture to real stops and, once the scene has been metered, solves the
-    /// shutter and snaps it too — flagging the shutter as the computed leg. This
-    /// is the single place the aperture-priority mode (which leg is solved, and
-    /// how) is expressed, so the pending and metered cases can't drift apart.
+    /// The raw f-number that balances the exposure in shutter-priority: the
+    /// photographer sets the ISO and shutter, and this solves the third leg from
+    /// the scene's EV@ISO100.
+    ///
+    /// From `EV = log2(N²/t) − log2(ISO/100)`, solving for `N`:
+    ///
+    ///     N = √(t · 2^EV100 · ISO/100)
+    ///
+    /// The result is exact — not yet snapped to a dial mark; feed it through
+    /// `PhotographicScale.aperture` (or use `solvedTriangle`) to make it settable.
+    ///
+    /// - Precondition: `iso` and `shutter` must be positive and finite (the
+    ///   scene's own EV is already validated at the camera boundary).
+    static func apertureFNumber(evAtISO100: Double, iso: Double, shutter: Double) -> Double {
+        (shutter * pow(2, evAtISO100) * (iso / 100)).squareRoot()
+    }
+
+    /// Builds the exposure triangle for the active priority mode: snaps the two
+    /// legs the photographer set to real stops and, once the scene has been
+    /// metered, solves and snaps the third — flagging it as the computed leg.
+    /// This is the single place a mode's solve (which leg is computed, and how)
+    /// is expressed, so the pending and metered cases can't drift apart.
     ///
     /// - Parameters:
+    ///   - mode: Which leg is locked and which is solved.
     ///   - evAtISO100: The scene's exposure value at ISO 100, or `nil` before the
-    ///     first reading (the shutter is left `nil`/pending).
+    ///     first reading (the solved leg is left `nil`/pending).
     ///   - iso: The ISO the photographer set (snapped to the ISO scale).
-    ///   - aperture: The aperture the photographer set (snapped to the f-scale).
-    static func solvedTriangle(evAtISO100: Double?, iso: Double, aperture: Double) -> ExposureTriangle {
+    ///   - aperture: The aperture — a set input in aperture-priority, ignored
+    ///     (solved instead) in shutter-priority.
+    ///   - shutter: The shutter duration — a set input in shutter-priority,
+    ///     ignored (solved instead) in aperture-priority.
+    static func solvedTriangle(
+        mode: PriorityMode,
+        evAtISO100: Double?,
+        iso: Double,
+        aperture: Double,
+        shutter: Double
+    ) -> ExposureTriangle {
         let isoStop = PhotographicScale.iso.snap(iso)
-        let apertureStop = PhotographicScale.aperture.snap(aperture)
-        let shutter = evAtISO100.map { ev in
-            PhotographicScale.shutter.snap(
-                shutterDuration(evAtISO100: ev, iso: isoStop.value, aperture: apertureStop.value)
+        switch mode {
+        case .aperturePriority:
+            let apertureStop = PhotographicScale.aperture.snap(aperture)
+            let shutterStop = evAtISO100.map { ev in
+                PhotographicScale.shutter.snap(
+                    shutterDuration(evAtISO100: ev, iso: isoStop.value, aperture: apertureStop.value)
+                )
+            }
+            return ExposureTriangle(
+                iso: isoStop,
+                aperture: apertureStop,
+                shutter: shutterStop,
+                solved: .shutter
+            )
+        case .shutterPriority:
+            let shutterStop = PhotographicScale.shutter.snap(shutter)
+            let apertureStop = evAtISO100.map { ev in
+                PhotographicScale.aperture.snap(
+                    apertureFNumber(evAtISO100: ev, iso: isoStop.value, shutter: shutterStop.value)
+                )
+            }
+            return ExposureTriangle(
+                iso: isoStop,
+                aperture: apertureStop,
+                shutter: shutterStop,
+                solved: .aperture
             )
         }
-        return ExposureTriangle(
-            iso: isoStop,
-            aperture: apertureStop,
-            shutter: shutter,
-            solved: .shutter
-        )
     }
 }

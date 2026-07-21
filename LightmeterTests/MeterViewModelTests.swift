@@ -112,7 +112,7 @@ struct MeterViewModelTests {
 
         let triangle = vm.triangle
         #expect(triangle.iso.label == "100")
-        #expect(triangle.aperture.label == "8")
+        #expect(triangle.aperture?.label == "8")
         #expect(triangle.shutter == nil)
         #expect(triangle.solved == .shutter)
         #expect(triangle.isSolved(.shutter))
@@ -166,7 +166,7 @@ struct MeterViewModelTests {
 
         // Opening two stops to f/8 lets in 4× the light → shutter 4× faster.
         vm.setAperture(8)
-        #expect(vm.triangle.aperture.label == "8")
+        #expect(vm.triangle.aperture?.label == "8")
         #expect(abs(atF16 / vm.triangle.shutter!.value - 4) < 0.01)
     }
 
@@ -250,7 +250,7 @@ struct MeterViewModelTests {
 
         // Two 1/3-stop clicks per stop → six clicks opens two full stops to f/4.
         vm.setBoundStopIndex(f8Index - 6)
-        #expect(vm.triangle.aperture.label == "4")
+        #expect(vm.triangle.aperture?.label == "4")
         #expect(abs(atF8 / vm.triangle.shutter!.value - 4) < 0.01)
     }
 
@@ -265,5 +265,94 @@ struct MeterViewModelTests {
 
         vm.setBoundStopIndex(-9_999)
         #expect(vm.boundStopIndex == 0)
+    }
+
+    // MARK: - Priority mode
+
+    /// Aperture-priority is the default: the shutter is the solved leg and the
+    /// two set legs (ISO, aperture) are editable.
+    @Test func aperturePriorityIsTheDefaultMode() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        #expect(vm.mode == .aperturePriority)
+        #expect(vm.triangle.solved == .shutter)
+        #expect(vm.isEditable(.aperture))
+        #expect(!vm.isEditable(.shutter))
+    }
+
+    /// The ticket's demo: switching to shutter-priority makes the shutter an
+    /// input and the aperture the solved value. The chip routing flips with it —
+    /// shutter becomes editable, aperture becomes solved.
+    @Test func switchingToShutterPriorityFlipsWhichLegIsSolved() async {
+        let source = FakeLightSource()
+        let vm = MeterViewModel(source: source)
+        vm.setShutter(1.0 / 128)
+        await vm.start()
+
+        source.emit(LightReading(iso: 100, exposureDuration: 1.0 / 128.0, aperture: 16))
+        await waitUntil { vm.triangle.shutter != nil }
+        // Aperture-priority to start: shutter solved, aperture an input.
+        #expect(vm.triangle.solved == .shutter)
+
+        vm.setMode(.shutterPriority)
+
+        #expect(vm.mode == .shutterPriority)
+        #expect(vm.triangle.solved == .aperture)
+        #expect(vm.isEditable(.shutter))
+        #expect(!vm.isEditable(.aperture))
+        // Sunny 16, EV 15 at ISO 100, 1/125 solves the aperture back to f/16.
+        #expect(vm.triangle.shutter?.label == "1/125")
+        #expect(vm.triangle.aperture?.label == "16")
+    }
+
+    /// `toggleMode()` flips between the two modes — the single mode control.
+    @Test func toggleModeSwitchesBothWays() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        vm.toggleMode()
+        #expect(vm.mode == .shutterPriority)
+        vm.toggleMode()
+        #expect(vm.mode == .aperturePriority)
+    }
+
+    /// Switching modes unbinds the dial if it was bound to the leg that becomes
+    /// solved (and so non-editable) — the dial must never drive a computed leg.
+    @Test func switchingModeUnbindsTheDialFromANowSolvedLeg() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        vm.bindDial(to: .aperture)
+        #expect(vm.boundComponent == .aperture)
+
+        // Shutter-priority solves the aperture, so the aperture dial must unbind.
+        vm.setMode(.shutterPriority)
+        #expect(vm.boundComponent == nil)
+    }
+
+    /// A dial bound to a leg that stays editable across the switch is left alone.
+    @Test func switchingModeKeepsADialBoundToAStillEditableLeg() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        vm.bindDial(to: .iso) // ISO is a set input in both modes
+        vm.setMode(.shutterPriority)
+        #expect(vm.boundComponent == .iso)
+    }
+
+    /// In shutter-priority the shutter is a dial-able input: stepping it re-solves
+    /// the aperture live. A slower shutter (more light) stops the aperture down.
+    @Test func steppingTheShutterInShutterPriorityResolvesTheAperture() async {
+        let source = FakeLightSource()
+        let vm = MeterViewModel(source: source)
+        vm.setMode(.shutterPriority)
+        vm.setShutter(1.0 / 128)
+        vm.bindDial(to: .shutter)
+        await vm.start()
+
+        source.emit(LightReading(iso: 100, exposureDuration: 1.0 / 128.0, aperture: 16))
+        await waitUntil { vm.triangle.aperture != nil }
+        let atFast = vm.triangle.aperture!.value
+        let fastIndex = vm.boundStopIndex!
+
+        // Shutter stops ascend by duration, so a higher index is a slower speed.
+        // Six 1/3-stop clicks slows two full stops (1/125 → 1/30), ~4× the light,
+        // so the solved aperture stops down two stops (f/16 → f/32, 2×N).
+        vm.setBoundStopIndex(fastIndex + 6)
+        #expect(vm.triangle.shutter?.label == "1/30")
+        #expect(abs(vm.triangle.aperture!.value / atFast - 2) < 0.02)
     }
 }
