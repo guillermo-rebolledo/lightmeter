@@ -189,9 +189,9 @@ final class MeterViewModel {
     /// The index within `boundStops` of the bound leg's current value, or `nil`
     /// when nothing is bound — the stop the dial's fixed indicator points at.
     var boundStopIndex: Int? {
-        guard let boundComponent, let value = value(for: boundComponent) else { return nil }
+        guard let boundComponent else { return nil }
         let scale = boundComponent.scale
-        return scale.stops.firstIndex(of: scale.snap(value))
+        return scale.stops.firstIndex(of: scale.snap(value(for: boundComponent)))
     }
 
     /// Drives the dial: sets the bound leg to the stop at `index` (clamped to the
@@ -207,9 +207,9 @@ final class MeterViewModel {
         }
     }
 
-    /// The current set value of a leg. The dial is only ever bound to an editable
-    /// (set) leg, so the value returned for a bound leg is always the live input.
-    private func value(for component: ExposureComponent) -> Double? {
+    /// The current set value of a leg — its live stored input. The dial is only
+    /// ever bound to an editable (set) leg, so this is always the value it drives.
+    private func value(for component: ExposureComponent) -> Double {
         switch component {
         case .iso: return iso
         case .aperture: return aperture
