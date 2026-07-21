@@ -62,10 +62,12 @@ struct ContentView: View {
                 NavigationLink(value: Destination.settings) {
                     Label("Settings", systemImage: "gearshape")
                         .labelStyle(.iconOnly)
+                        .foregroundStyle(.tint)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .tint(.yellow)
                 .guidedTourAnchor(.settings)
                 .padding(.top, 4)
                 .padding(.trailing, 8)
