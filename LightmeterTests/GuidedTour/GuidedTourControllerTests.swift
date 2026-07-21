@@ -128,17 +128,15 @@ struct GuidedTourControllerTests {
         "Final step demonstrates Hold and restores live metering",
         .bug("https://github.com/guillermo-rebolledo/lightmeter/issues/28")
     )
-    func finalStepDemonstratesHold() async {
+    func finalStepDemonstratesHold() async throws {
         let preferences = MeterPreferences(defaults: nil)
         let source = FakeLightSource()
         let model = MeterViewModel(source: source, preferences: preferences)
         let controller = GuidedTourController(preferences: preferences, model: model)
         await model.start()
         source.emit(LightReading(iso: 100, exposureDuration: 1.0 / 125, aperture: 8))
-        for _ in 0..<10_000 where model.latestReading == nil {
-            await Task.yield()
-        }
-        #expect(model.latestReading != nil)
+        await waitUntil { model.latestReading != nil }
+        _ = try #require(model.latestReading)
 
         controller.update(for: .metering, isMeterReady: true, isVoiceOverRunning: false)
         for _ in 0..<5 {
@@ -228,5 +226,16 @@ struct GuidedTourControllerTests {
         let model = MeterViewModel(source: FakeLightSource(), preferences: preferences)
         let controller = GuidedTourController(preferences: preferences, model: model)
         return (controller, preferences, model)
+    }
+
+    private func waitUntil(
+        _ predicate: () -> Bool,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) async {
+        for _ in 0..<10_000 {
+            if predicate() { return }
+            await Task.yield()
+        }
+        Issue.record("Condition never became true", sourceLocation: sourceLocation)
     }
 }

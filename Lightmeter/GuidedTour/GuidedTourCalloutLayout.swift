@@ -25,7 +25,11 @@ struct GuidedTourCalloutLayout: Layout {
         let dimensions = callout.dimensions(
             in: ProposedViewSize(width: width, height: nil)
         )
-        let calloutSize = CGSize(width: width, height: dimensions.height)
+        let maximumHeight = max(bounds.height - (margin * 2), 0)
+        let calloutSize = CGSize(
+            width: width,
+            height: min(dimensions.height, maximumHeight)
+        )
         let x = min(
             max(targetFrame.midX - (width / 2), bounds.minX + margin),
             bounds.maxX - margin - width
