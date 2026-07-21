@@ -27,7 +27,7 @@ struct CameraPreviewView: UIViewRepresentable {
     var onPlaceSpot: (CGPoint) -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onPlaceSpot: onPlaceSpot)
+        Coordinator(onPlaceSpot: onPlaceSpot, isSpotActive: isSpotActive)
     }
 
     func makeUIView(context: Context) -> PreviewView {
@@ -46,6 +46,7 @@ struct CameraPreviewView: UIViewRepresentable {
     func updateUIView(_ uiView: PreviewView, context: Context) {
         uiView.videoPreviewLayer.session = session
         context.coordinator.onPlaceSpot = onPlaceSpot
+        context.coordinator.isSpotActive = isSpotActive
         uiView.updateReticle(devicePoint: spot, visible: isSpotActive)
     }
 
@@ -53,12 +54,18 @@ struct CameraPreviewView: UIViewRepresentable {
     /// a normalized device point through the preview layer.
     final class Coordinator {
         var onPlaceSpot: (CGPoint) -> Void
+        /// Whether spot metering is active — taps place a spot only then, so a
+        /// stray tap in average mode can't silently switch the pattern. The
+        /// metering-pattern toggle is the only control that changes the mode.
+        var isSpotActive: Bool
 
-        init(onPlaceSpot: @escaping (CGPoint) -> Void) {
+        init(onPlaceSpot: @escaping (CGPoint) -> Void, isSpotActive: Bool) {
             self.onPlaceSpot = onPlaceSpot
+            self.isSpotActive = isSpotActive
         }
 
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
+            guard isSpotActive else { return }
             guard let view = gesture.view as? PreviewView else { return }
             let layerPoint = gesture.location(in: view)
             let devicePoint = view.videoPreviewLayer.captureDevicePointConverted(

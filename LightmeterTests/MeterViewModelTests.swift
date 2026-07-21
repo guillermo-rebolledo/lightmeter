@@ -438,9 +438,13 @@ struct MeterViewModelTests {
         let vm = MeterViewModel(source: source)
         let point = CGPoint(x: 0.6, y: 0.4)
         vm.placeSpot(at: point)
+        let callsBeforeStart = source.exposurePointCallCount
 
         await vm.start()
 
+        // start() must route the point afresh — not merely leave the value
+        // placeSpot(at:) already set — so the new session meters it from the off.
+        #expect(source.exposurePointCallCount == callsBeforeStart + 1)
         #expect(source.lastExposurePoint == point)
     }
 
