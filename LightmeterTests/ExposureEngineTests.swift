@@ -232,6 +232,29 @@ struct ExposureEngineTests {
         #expect(abs(afterSecond - combined) < 1e-12)
     }
 
+    /// Compensation also biases advisory calculations: +1 EV moves the solved
+    /// shutter from the safe 1/60 s edge to 1/30 s, which carries handheld risk.
+    @Test func compensationFlowsIntoAdvisories() {
+        let atHandheldLimit = ExposureEngine.advisories(
+            mode: .aperturePriority,
+            evAtISO100: log2(60),
+            iso: 100,
+            aperture: 1,
+            shutter: 1.0 / 125
+        )
+        let compensated = ExposureEngine.advisories(
+            mode: .aperturePriority,
+            evAtISO100: log2(60),
+            compensation: 1,
+            iso: 100,
+            aperture: 1,
+            shutter: 1.0 / 125
+        )
+
+        #expect(atHandheldLimit.isEmpty)
+        #expect(compensated == [.handheldRisk])
+    }
+
     // MARK: - Advisories
 
     @Test func shutterAdvisoriesRespectThresholdEdges() {
