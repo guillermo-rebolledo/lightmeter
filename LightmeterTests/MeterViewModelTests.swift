@@ -102,4 +102,88 @@ struct MeterViewModelTests {
         #expect(source.didStop)
         #expect(vm.status == .idle)
     }
+
+    // MARK: - Exposure triangle
+
+    /// Before any reading the two set legs show, the shutter is pending, and the
+    /// shutter is flagged as the solved (non-editable) leg.
+    @Test func triangleShowsSetLegsWithPendingShutterBeforeMetering() {
+        let vm = MeterViewModel(source: FakeLightSource())
+
+        let triangle = vm.triangle
+        #expect(triangle.iso.label == "100")
+        #expect(triangle.aperture.label == "8")
+        #expect(triangle.shutter == nil)
+        #expect(triangle.solved == .shutter)
+        #expect(triangle.isSolved(.shutter))
+    }
+
+    /// Metering a scene solves the shutter live and snaps it to a dial mark.
+    /// Sunny 16 at ISO 100, f/16 solves to 1/125.
+    @Test func triangleSolvesShutterLiveFromReadings() async {
+        let source = FakeLightSource()
+        let vm = MeterViewModel(source: source)
+        vm.setAperture(16)
+        await vm.start()
+
+        source.emit(LightReading(iso: 100, exposureDuration: 1.0 / 128.0, aperture: 16))
+        await waitUntil { vm.triangle.shutter != nil }
+
+        #expect(vm.triangle.shutter?.label == "1/125")
+        #expect(vm.triangle.isSolved(.shutter))
+    }
+
+    /// The solved shutter tracks the light: a dimmer scene yields a slower
+    /// (longer) shutter — the ticket's demo behavior.
+    @Test func solvedShutterTracksTheLight() async {
+        let source = FakeLightSource()
+        let vm = MeterViewModel(source: source)
+        vm.setAperture(8)
+        await vm.start()
+
+        // Bright scene (Sunny 16, EV 15).
+        source.emit(LightReading(iso: 100, exposureDuration: 1.0 / 128.0, aperture: 16))
+        await waitUntil { vm.triangle.shutter != nil }
+        let bright = vm.triangle.shutter!.value
+
+        // A much dimmer scene (EV 0): shutter opens up to a longer duration.
+        source.emit(LightReading(iso: 100, exposureDuration: 1.0, aperture: 1))
+        await waitUntil { (vm.triangle.shutter?.value ?? bright) > bright }
+        #expect(vm.triangle.shutter!.value > bright)
+    }
+
+    /// The aperture is a live input: changing it re-solves the shutter from the
+    /// same scene light (fixed aperture, solved shutter — aperture-priority).
+    @Test func changingApertureResolvesShutter() async {
+        let source = FakeLightSource()
+        let vm = MeterViewModel(source: source)
+        vm.setAperture(16)
+        await vm.start()
+
+        source.emit(LightReading(iso: 100, exposureDuration: 1.0 / 128.0, aperture: 16))
+        await waitUntil { vm.triangle.shutter != nil }
+        let atF16 = vm.triangle.shutter!.value
+
+        // Opening two stops to f/8 lets in 4× the light → shutter 4× faster.
+        vm.setAperture(8)
+        #expect(vm.triangle.aperture.label == "8")
+        #expect(abs(atF16 / vm.triangle.shutter!.value - 4) < 0.01)
+    }
+
+    /// ISO is a live input too: raising it one stop re-solves to a shutter one
+    /// stop faster (half the duration) from the same scene light.
+    @Test func changingISOResolvesShutter() async {
+        let source = FakeLightSource()
+        let vm = MeterViewModel(source: source)
+        vm.setISO(100)
+        await vm.start()
+
+        source.emit(LightReading(iso: 100, exposureDuration: 1.0 / 128.0, aperture: 16))
+        await waitUntil { vm.triangle.shutter != nil }
+        let atISO100 = vm.triangle.shutter!.value
+
+        vm.setISO(200)
+        #expect(vm.triangle.iso.label == "200")
+        #expect(abs(atISO100 / vm.triangle.shutter!.value - 2) < 0.01)
+    }
 }

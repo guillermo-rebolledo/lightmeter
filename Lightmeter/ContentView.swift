@@ -22,36 +22,46 @@ struct ContentView: View {
             case .idle, .metering:
                 CameraPreviewView(session: camera.session)
                     .ignoresSafeArea()
-                evReadout
+                meterOverlay
             case .denied:
                 DeniedView()
             }
         }
+        .tint(.yellow)
         .task { await model.start() }
         .onDisappear { model.stop() }
     }
 
-    /// The EV@ISO100 readout, floated over the preview near the bottom edge.
-    private var evReadout: some View {
+    /// The metering HUD floated over the preview near the bottom edge: the scene
+    /// EV@ISO100 reference above the three exposure-triangle chips.
+    private var meterOverlay: some View {
         VStack {
             Spacer()
-            VStack(spacing: 4) {
-                Text("EV @ ISO 100")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .textCase(.uppercase)
-                    .tracking(1.5)
-
-                Text(model.ev.map { String(format: "%.1f", $0) } ?? "—")
-                    .font(.system(size: 68, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
-                    .contentTransition(.numericText())
+            VStack(spacing: 16) {
+                evReadout
+                ExposureChipsView(triangle: model.triangle)
             }
-            .padding(.vertical, 18)
-            .padding(.horizontal, 32)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .padding(.bottom, 56)
+            .padding(20)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .padding(.horizontal, 16)
+            .padding(.bottom, 44)
+        }
+    }
+
+    /// The EV@ISO100 readout — the raw reference for the scene's light level.
+    private var evReadout: some View {
+        VStack(spacing: 2) {
+            Text("EV @ ISO 100")
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+                .tracking(1.5)
+
+            Text(model.ev.map { String(format: "%.1f", $0) } ?? "—")
+                .font(.system(size: 46, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.white)
+                .contentTransition(.numericText())
         }
         .animation(.snappy, value: model.ev)
     }

@@ -39,6 +39,21 @@ final class MeterViewModel {
     /// reading.
     private(set) var ev: Double?
 
+    /// The ISO the photographer has set (their film stock / sensor setting).
+    /// Always an input in v1; drives the aperture-priority solve.
+    private(set) var iso: Double = 100
+
+    /// The aperture the photographer has set. In aperture-priority (v1 default)
+    /// this is the fixed leg and the shutter is solved from it.
+    private(set) var aperture: Double = 8
+
+    /// The exposure triangle for the current scene: the two legs the
+    /// photographer set plus the solved shutter, each snapped to a real,
+    /// dial-able stop. `shutter` is `nil` until the scene has been metered.
+    var triangle: ExposureTriangle {
+        ExposureEngine.solvedTriangle(evAtISO100: ev, iso: iso, aperture: aperture)
+    }
+
     private let source: LightSource
     private var meteringTask: Task<Void, Never>?
 
@@ -91,5 +106,17 @@ final class MeterViewModel {
         if status == .metering {
             status = .idle
         }
+    }
+
+    /// Sets the photographer's ISO. The triangle re-solves the shutter from the
+    /// new value on the next read. (The dial that drives this lands in #5.)
+    func setISO(_ value: Double) {
+        iso = value
+    }
+
+    /// Sets the photographer's aperture (the fixed leg in aperture-priority).
+    /// The triangle re-solves the shutter from the new value on the next read.
+    func setAperture(_ value: Double) {
+        aperture = value
     }
 }

@@ -53,4 +53,49 @@ enum ExposureEngine {
             aperture: reading.aperture
         )
     }
+
+    /// The raw shutter duration (seconds) that balances the exposure in
+    /// aperture-priority: the photographer sets the ISO and aperture, and this
+    /// solves the third leg from the scene's EV@ISO100.
+    ///
+    /// From `EV = log2(N²/t) − log2(ISO/100)`, solving for `t` at the scene's
+    /// EV normalized to ISO 100:
+    ///
+    ///     t = N² / (2^EV100 · ISO/100)
+    ///
+    /// The result is exact — not yet snapped to a dial mark; feed it through
+    /// `PhotographicScale.shutter` (or use `solvedTriangle`) to make it settable.
+    ///
+    /// - Precondition: `iso` and `aperture` must be positive and finite (the
+    ///   scene's own EV is already validated at the camera boundary).
+    static func shutterDuration(evAtISO100: Double, iso: Double, aperture: Double) -> Double {
+        (aperture * aperture) / (pow(2, evAtISO100) * (iso / 100))
+    }
+
+    /// Builds the aperture-priority triangle: snaps the photographer's ISO and
+    /// aperture to real stops and, once the scene has been metered, solves the
+    /// shutter and snaps it too — flagging the shutter as the computed leg. This
+    /// is the single place the aperture-priority mode (which leg is solved, and
+    /// how) is expressed, so the pending and metered cases can't drift apart.
+    ///
+    /// - Parameters:
+    ///   - evAtISO100: The scene's exposure value at ISO 100, or `nil` before the
+    ///     first reading (the shutter is left `nil`/pending).
+    ///   - iso: The ISO the photographer set (snapped to the ISO scale).
+    ///   - aperture: The aperture the photographer set (snapped to the f-scale).
+    static func solvedTriangle(evAtISO100: Double?, iso: Double, aperture: Double) -> ExposureTriangle {
+        let isoStop = PhotographicScale.iso.snap(iso)
+        let apertureStop = PhotographicScale.aperture.snap(aperture)
+        let shutter = evAtISO100.map { ev in
+            PhotographicScale.shutter.snap(
+                shutterDuration(evAtISO100: ev, iso: isoStop.value, aperture: apertureStop.value)
+            )
+        }
+        return ExposureTriangle(
+            iso: isoStop,
+            aperture: apertureStop,
+            shutter: shutter,
+            solved: .shutter
+        )
+    }
 }
