@@ -17,6 +17,12 @@ final class MeterPreferences {
         }
     }
 
+    var hasSeenGuidedTour: Bool {
+        didSet {
+            defaults?.set(hasSeenGuidedTour, forKey: Keys.hasSeenGuidedTour)
+        }
+    }
+
     private let defaults: UserDefaults?
 
     init(defaults: UserDefaults? = .standard) {
@@ -25,10 +31,12 @@ final class MeterPreferences {
             rawValue: defaults?.string(forKey: Keys.increment) ?? ""
         ) ?? .third
         calibrationOffset = defaults?.double(forKey: Keys.calibrationOffset) ?? 0
+        hasSeenGuidedTour = defaults?.bool(forKey: Keys.hasSeenGuidedTour) ?? false
     }
 
     private enum Keys {
         static let increment = "meter.stopIncrement"
         static let calibrationOffset = "meter.calibrationOffset"
+        static let hasSeenGuidedTour = "meter.hasSeenGuidedTour"
     }
 }

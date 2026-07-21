@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Bindable var preferences: MeterPreferences
+    let onShowTour: () -> Void
 
     var body: some View {
         Form {
@@ -29,6 +30,12 @@ struct SettingsView: View {
             } footer: {
                 Text("Use a positive offset when this meter consistently reads lower than a trusted meter or camera.")
             }
+
+            Section {
+                Button("Show tour", action: onShowTour)
+            } footer: {
+                Text("Replay the guided introduction on the live meter.")
+            }
         }
         .navigationTitle("Settings")
     }
@@ -54,6 +61,6 @@ struct SettingsView: View {
 
 #Preview {
     NavigationStack {
-        SettingsView(preferences: MeterPreferences())
+        SettingsView(preferences: MeterPreferences(), onShowTour: {})
     }
 }
