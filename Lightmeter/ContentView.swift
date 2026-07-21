@@ -80,16 +80,37 @@ struct ContentView: View {
                     if tour.isPresented,
                        let step = tour.currentStep,
                        let anchor = anchors[step] {
-                        GuidedTourOverlay(
+                        let overlay = GuidedTourOverlay(
                             step: step,
                             targetFrame: geometry[anchor],
                             progressLabel: tour.progressLabel,
                             onAdvance: tour.advance,
                             onSkip: tour.skip
                         )
+
+                        if reduceMotion {
+                            // Reduce Motion: re-identifying by step swaps the
+                            // overlay so its opacity transition cross-fades with
+                            // no positional movement.
+                            overlay
+                                .id(step)
+                                .transition(.opacity)
+                        } else {
+                            // Stable identity: the changed target frame flows
+                            // through the spotlight's animatableData so the
+                            // cutout slides and resizes to the next step.
+                            overlay
+                        }
                     }
                 }
                 .ignoresSafeArea()
+                // Single driver for both paths: the crossfade transition above
+                // and the spotlight's frame interpolation are the same `step`
+                // change, so one animation keeps the two modes from competing.
+                .animation(
+                    reduceMotion ? .easeInOut(duration: 0.25) : .snappy,
+                    value: tour.currentStep
+                )
             }
             .navigationDestination(for: Destination.self) { destination in
                 switch destination {
