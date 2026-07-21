@@ -141,4 +141,71 @@ enum ExposureEngine {
             )
         }
     }
+
+    /// Computes generic safety guidance from the unsnapped solved value.
+    ///
+    /// Shutter guidance applies only in aperture-priority, where shutter is the
+    /// engine's recommendation. A shutter slower than 1/60 s risks camera shake;
+    /// at 1/15 s or slower, the stronger tripod recommendation replaces it.
+    /// Range checks happen before snapping so clamping cannot hide an extreme
+    /// solve. No advisories are produced before the first valid meter reading.
+    static func advisories(
+        mode: PriorityMode,
+        evAtISO100: Double?,
+        iso: Double,
+        aperture: Double,
+        shutter: Double
+    ) -> [ExposureAdvisory] {
+        guard let evAtISO100 else { return [] }
+
+        let isoStop = PhotographicScale.iso.snap(iso)
+        switch mode {
+        case .aperturePriority:
+            let apertureStop = PhotographicScale.aperture.snap(aperture)
+            let solvedShutter = shutterDuration(
+                evAtISO100: evAtISO100,
+                iso: isoStop.value,
+                aperture: apertureStop.value
+            )
+            var advisories: [ExposureAdvisory] = []
+            if isAtLeast(solvedShutter, threshold: 1.0 / 15) {
+                advisories.append(.tripodRecommended)
+            } else if isAtMost(solvedShutter, threshold: 1.0 / 60) == false {
+                advisories.append(.handheldRisk)
+            }
+            if isWithin(solvedShutter, scale: .shutter) == false {
+                advisories.append(.outsideTypicalRange(.shutter))
+            }
+            return advisories
+
+        case .shutterPriority:
+            let shutterStop = PhotographicScale.shutter.snap(shutter)
+            let solvedAperture = apertureFNumber(
+                evAtISO100: evAtISO100,
+                iso: isoStop.value,
+                shutter: shutterStop.value
+            )
+            return isWithin(solvedAperture, scale: .aperture)
+                ? []
+                : [.outsideTypicalRange(.aperture)]
+        }
+    }
+
+    private static func isWithin(_ value: Double, scale: PhotographicScale) -> Bool {
+        guard let first = scale.stops.first, let last = scale.stops.last else {
+            return false
+        }
+        return isAtLeast(value, threshold: first.value)
+            && isAtMost(value, threshold: last.value)
+    }
+
+    /// Treats floating-point round-off at a documented threshold as equality.
+    private static func isAtLeast(_ value: Double, threshold: Double) -> Bool {
+        value >= threshold || abs(value - threshold) <= threshold * 1e-12
+    }
+
+    /// Treats floating-point round-off at a documented threshold as equality.
+    private static func isAtMost(_ value: Double, threshold: Double) -> Bool {
+        value <= threshold || abs(value - threshold) <= threshold * 1e-12
+    }
 }

@@ -46,6 +46,12 @@ struct ContentView: View {
             Spacer()
             VStack(spacing: 16) {
                 evReadout
+                FreezeButton(
+                    isFrozen: model.isFrozen,
+                    canFreeze: model.latestReading != nil,
+                    onToggle: model.toggleFreeze
+                )
+                AdvisoriesView(advisories: model.advisories)
                 MeteringPatternToggle(
                     pattern: model.pattern,
                     onSelect: { model.setPattern($0) }
@@ -103,7 +109,7 @@ struct ContentView: View {
                 .foregroundStyle(.white)
                 .contentTransition(.numericText())
         }
-        .animation(.snappy, value: model.ev)
+        .animation(reduceMotion ? nil : .snappy, value: model.ev)
     }
 }
 

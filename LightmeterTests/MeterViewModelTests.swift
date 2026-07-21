@@ -104,6 +104,53 @@ struct MeterViewModelTests {
         #expect(vm.status == .idle)
     }
 
+    // MARK: - Freeze and advisories
+
+    @Test func freezeHoldsTheReadingUntilLiveMeteringResumes() async {
+        let source = FakeLightSource()
+        let vm = MeterViewModel(source: source)
+        await vm.start()
+
+        let held = LightReading(
+            iso: 100,
+            exposureDuration: 1.0 / 128,
+            aperture: 16
+        )
+        source.emit(held)
+        await waitUntil { vm.latestReading == held }
+
+        vm.toggleFreeze()
+        #expect(vm.isFrozen)
+
+        let ignored = LightReading(iso: 100, exposureDuration: 1, aperture: 1)
+        source.emit(ignored)
+        for _ in 0..<100 {
+            await Task.yield()
+        }
+        #expect(vm.latestReading == held)
+
+        vm.toggleFreeze()
+        #expect(vm.isFrozen == false)
+
+        let resumed = LightReading(iso: 100, exposureDuration: 0.5, aperture: 1)
+        source.emit(resumed)
+        await waitUntil { vm.latestReading == resumed }
+        #expect(vm.latestReading == resumed)
+    }
+
+    @Test func advisoriesSurfaceFromTheCurrentSolve() async {
+        let source = FakeLightSource()
+        let vm = MeterViewModel(source: source)
+        vm.setAperture(8)
+        await vm.start()
+
+        // EV 6 at ISO 100 and f/8 solves to 1 second.
+        source.emit(LightReading(iso: 100, exposureDuration: 1, aperture: 8))
+        await waitUntil { vm.ev != nil }
+
+        #expect(vm.advisories == [.tripodRecommended])
+    }
+
     // MARK: - Exposure triangle
 
     /// Before any reading the two set legs show, the shutter is pending, and the

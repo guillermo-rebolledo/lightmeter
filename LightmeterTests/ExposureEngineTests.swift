@@ -198,4 +198,131 @@ struct ExposureEngineTests {
         #expect(triangle.iso.label == "400")
         #expect(triangle.aperture?.label == "16")
     }
+
+    // MARK: - Advisories
+
+    @Test func shutterAdvisoriesRespectThresholdEdges() {
+        let atHandheldLimit = ExposureEngine.advisories(
+            mode: .aperturePriority,
+            evAtISO100: log2(60),
+            iso: 100,
+            aperture: 1,
+            shutter: 1.0 / 125
+        )
+        let roundOffAboveHandheldLimit = ExposureEngine.advisories(
+            mode: .aperturePriority,
+            evAtISO100: log2(1 / ((1.0 / 60) * (1 + 5e-13))),
+            iso: 100,
+            aperture: 1,
+            shutter: 1.0 / 125
+        )
+        let slowerThanHandheldLimit = ExposureEngine.advisories(
+            mode: .aperturePriority,
+            evAtISO100: log2(50),
+            iso: 100,
+            aperture: 1,
+            shutter: 1.0 / 125
+        )
+        let atTripodThreshold = ExposureEngine.advisories(
+            mode: .aperturePriority,
+            evAtISO100: log2(15),
+            iso: 100,
+            aperture: 1,
+            shutter: 1.0 / 125
+        )
+
+        #expect(atHandheldLimit.isEmpty)
+        #expect(roundOffAboveHandheldLimit.isEmpty)
+        #expect(slowerThanHandheldLimit == [.handheldRisk])
+        #expect(atTripodThreshold == [.tripodRecommended])
+    }
+
+    @Test func shutterOutsideScaleIsReportedBeforeSnapping() {
+        let advisories = ExposureEngine.advisories(
+            mode: .aperturePriority,
+            evAtISO100: 0,
+            iso: 100,
+            aperture: 8,
+            shutter: 1.0 / 125
+        )
+
+        #expect(advisories.contains(.tripodRecommended))
+        #expect(advisories.contains(.outsideTypicalRange(.shutter)))
+    }
+
+    @Test func apertureOutsideScaleIsReportedBeforeSnapping() {
+        let advisories = ExposureEngine.advisories(
+            mode: .shutterPriority,
+            evAtISO100: 20,
+            iso: 100,
+            aperture: 8,
+            shutter: 1
+        )
+
+        #expect(advisories == [.outsideTypicalRange(.aperture)])
+    }
+
+    @Test func rangeAdvisoriesRespectScaleEdges() {
+        let fastestShutter = ExposureEngine.advisories(
+            mode: .aperturePriority,
+            evAtISO100: log2(8000),
+            iso: 100,
+            aperture: 1,
+            shutter: 1.0 / 125
+        )
+        let fasterThanScale = ExposureEngine.advisories(
+            mode: .aperturePriority,
+            evAtISO100: log2(9000),
+            iso: 100,
+            aperture: 1,
+            shutter: 1.0 / 125
+        )
+        let slowestShutter = ExposureEngine.advisories(
+            mode: .aperturePriority,
+            evAtISO100: log2(1.0 / 30),
+            iso: 100,
+            aperture: 1,
+            shutter: 1.0 / 125
+        )
+        let widestAperture = ExposureEngine.advisories(
+            mode: .shutterPriority,
+            evAtISO100: 0,
+            iso: 100,
+            aperture: 8,
+            shutter: 1
+        )
+        let widerThanScale = ExposureEngine.advisories(
+            mode: .shutterPriority,
+            evAtISO100: -1,
+            iso: 100,
+            aperture: 8,
+            shutter: 1
+        )
+        let narrowestAperture = ExposureEngine.advisories(
+            mode: .shutterPriority,
+            evAtISO100: 10,
+            iso: 100,
+            aperture: 8,
+            shutter: 1
+        )
+
+        #expect(fastestShutter.isEmpty)
+        #expect(fasterThanScale == [.outsideTypicalRange(.shutter)])
+        #expect(slowestShutter == [.tripodRecommended])
+        #expect(widestAperture.isEmpty)
+        #expect(widerThanScale == [.outsideTypicalRange(.aperture)])
+        #expect(narrowestAperture.isEmpty)
+    }
+
+    @Test func pendingSolveHasNoAdvisories() {
+        let advisories = ExposureEngine.advisories(
+            mode: .aperturePriority,
+            evAtISO100: nil,
+            iso: 100,
+            aperture: 8,
+            shutter: 1.0 / 125
+        )
+
+        #expect(advisories.isEmpty)
+    }
 }
