@@ -76,11 +76,11 @@ struct ArcDialView: View {
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .mask(edgeFade)
+            .opacity(isBound ? 1 : 0)
+            .animation(.easeOut(duration: 0.15), value: isBound)
 
             indicator.position(x: centerX, y: 8)
         }
-        .opacity(isBound ? 1 : 0)
-        .animation(.easeOut(duration: 0.15), value: isBound)
         .frame(height: Self.layoutHeight)
         .contentShape(Rectangle())
         .gesture(dialGesture)
