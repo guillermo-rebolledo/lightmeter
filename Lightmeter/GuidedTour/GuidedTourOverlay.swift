@@ -27,9 +27,8 @@ struct GuidedTourOverlay: View {
                 .accessibilityHidden(true)
 
             GuidedTourCalloutLayout(targetFrame: spotlightFrame) {
-                GuidedTourCallout(step: step)
+                GuidedTourCallout(step: step, onAdvance: onAdvance)
             }
-            .allowsHitTesting(false)
 
             VStack {
                 HStack {

@@ -19,10 +19,16 @@ struct ContentView: View {
     init(defaults: UserDefaults = .standard) {
         let camera = CameraLightSource()
         let preferences = MeterPreferences(defaults: defaults)
+        let model = MeterViewModel(source: camera, preferences: preferences)
         _camera = State(initialValue: camera)
-        _model = State(initialValue: MeterViewModel(source: camera, preferences: preferences))
+        _model = State(initialValue: model)
         _preferences = State(initialValue: preferences)
-        _tour = State(initialValue: GuidedTourController(preferences: preferences))
+        _tour = State(
+            initialValue: GuidedTourController(
+                preferences: preferences,
+                model: model
+            )
+        )
     }
 
     var body: some View {
@@ -51,6 +57,7 @@ struct ContentView: View {
                     NavigationLink(value: Destination.settings) {
                         Label("Settings", systemImage: "gearshape")
                     }
+                    .guidedTourAnchor(.settings)
                 }
             }
             .navigationDestination(for: Destination.self) { destination in
@@ -112,21 +119,26 @@ struct ContentView: View {
                         isBound: model.isCompensationDialBound,
                         onSelect: model.bindCompensationDial
                     )
+                    .guidedTourAnchor(.compensation)
                 }
                 AdvisoriesView(advisories: model.advisories)
                 MeteringPatternToggle(
                     pattern: model.pattern,
                     onSelect: { model.setPattern($0) }
                 )
-                PriorityModeToggle(
-                    mode: model.mode,
-                    onSelect: { model.setMode($0) }
-                )
-                ExposureChipsView(
-                    triangle: model.triangle,
-                    boundComponent: model.boundComponent,
-                    onSelect: { model.bindDial(to: $0) }
-                )
+                .guidedTourAnchor(.meteringPattern)
+                VStack(spacing: 16) {
+                    PriorityModeToggle(
+                        mode: model.mode,
+                        onSelect: { model.setMode($0) }
+                    )
+                    ExposureChipsView(
+                        triangle: model.triangle,
+                        boundComponent: model.boundComponent,
+                        onSelect: { model.bindDial(to: $0) }
+                    )
+                }
+                .guidedTourAnchor(.priorityAndChips)
             }
             .padding(20)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
@@ -134,6 +146,7 @@ struct ContentView: View {
 
             dial
                 .padding(.top, 8)
+                .guidedTourAnchor(.arcDial)
         }
         .padding(.bottom, 44)
     }

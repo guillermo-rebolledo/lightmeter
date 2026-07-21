@@ -16,14 +16,18 @@ final class GuidedTourController {
     }
 
     private let preferences: MeterPreferences
+    private let model: MeterViewModel?
     private let steps: [GuidedTourStep]
     private var replayPending = false
+    private var savedMeterState: MeterViewModelState?
 
     init(
         preferences: MeterPreferences,
-        steps: [GuidedTourStep] = [.evReadout]
+        model: MeterViewModel? = nil,
+        steps: [GuidedTourStep] = GuidedTourStep.allCases
     ) {
         self.preferences = preferences
+        self.model = model
         self.steps = steps
     }
 
@@ -41,6 +45,7 @@ final class GuidedTourController {
         case .denied, .unavailable:
             suppressAndConsumeTour()
         case .metering:
+            guard isPresented == false else { return }
             guard isMeterReady else { return }
             guard replayPending || preferences.hasSeenGuidedTour == false else { return }
             present()
@@ -70,6 +75,7 @@ final class GuidedTourController {
             return
         }
         currentStepIndex = nextIndex
+        choreographCurrentStep()
     }
 
     func skip() {
@@ -84,17 +90,50 @@ final class GuidedTourController {
         }
         replayPending = false
         currentStepIndex = 0
+        savedMeterState = model?.captureState()
         isPresented = true
+        choreographCurrentStep()
     }
 
     private func finish() {
+        restoreMeterState()
         isPresented = false
         preferences.hasSeenGuidedTour = true
     }
 
     private func suppressAndConsumeTour() {
         replayPending = false
+        restoreMeterState()
         isPresented = false
         preferences.hasSeenGuidedTour = true
+    }
+
+    private func choreographCurrentStep() {
+        guard let model, let currentStep else { return }
+
+        switch currentStep {
+        case .evReadout, .priorityAndChips:
+            break
+        case .meteringPattern:
+            model.setPattern(.spot)
+        case .arcDial:
+            if model.boundComponent != .iso {
+                model.bindDial(to: .iso)
+            }
+        case .compensation:
+            if model.isCompensationDialBound == false {
+                model.bindCompensationDial()
+            }
+        case .settings:
+            if model.isFrozen == false {
+                model.toggleFreeze()
+            }
+        }
+    }
+
+    private func restoreMeterState() {
+        guard let model, let savedMeterState else { return }
+        model.restoreState(savedMeterState)
+        self.savedMeterState = nil
     }
 }
