@@ -1,9 +1,8 @@
 import SwiftUI
-import UIKit
 
 /// The meter screen: a live camera preview as the hero, with the scene's
 /// EV@ISO100 read out over it and updating in real time. Falls back to a graceful
-/// denied state when camera access isn't granted.
+/// explanation when camera access is denied or capture is unavailable.
 struct ContentView: View {
     private enum Destination: Hashable {
         case settings
@@ -38,7 +37,9 @@ struct ContentView: View {
                     .ignoresSafeArea()
                     meterOverlay
                 case .denied:
-                    DeniedView()
+                    CameraStatusView(status: .denied)
+                case .unavailable:
+                    CameraStatusView(status: .unavailable)
                 }
             }
             .toolbar {
@@ -140,34 +141,6 @@ struct ContentView: View {
                 .contentTransition(.numericText())
         }
         .animation(reduceMotion ? nil : .snappy, value: model.ev)
-    }
-}
-
-/// Shown when camera access is denied or restricted, with a route to Settings.
-private struct DeniedView: View {
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "video.slash")
-                .font(.system(size: 52, weight: .thin))
-                .foregroundStyle(.white)
-
-            Text("Camera access needed")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(.white)
-
-            Text("Lightmeter reads the light from your camera to meter exposure. Enable camera access in Settings to start metering.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-
-            if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
-                Link("Open Settings", destination: settingsURL)
-                    .font(.body.weight(.semibold))
-                    .padding(.top, 4)
-            }
-        }
-        .padding()
     }
 }
 

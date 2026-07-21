@@ -68,7 +68,11 @@ struct MeterViewModelTests {
         #expect(vm.latestReading == dim)
     }
 
-    @Test func statusResetsToIdleWhenStreamFinishesWithoutStop() async {
+    @Test(
+        "Stream finishing without readings makes the camera unavailable",
+        .bug("https://github.com/guillermo-rebolledo/lightmeter/issues/12")
+    )
+    func streamFinishingWithoutReadingsMakesCameraUnavailable() async {
         let source = FakeLightSource()
         let vm = MeterViewModel(source: source)
         await vm.start()
@@ -77,8 +81,8 @@ struct MeterViewModelTests {
         // The source's capture ends on its own (e.g. no camera available).
         source.finishStream()
 
-        await waitUntil { vm.status == .idle }
-        #expect(vm.status == .idle)
+        await waitUntil { vm.status == .unavailable }
+        #expect(vm.status == .unavailable)
     }
 
     @Test func deniedAuthorizationShowsDeniedState() async {

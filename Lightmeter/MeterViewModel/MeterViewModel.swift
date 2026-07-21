@@ -28,6 +28,8 @@ final class MeterViewModel {
         case metering
         /// Camera access was denied; the UI shows a graceful denied state.
         case denied
+        /// Camera access was granted, but capture produced no readings.
+        case unavailable
     }
 
     /// The current lifecycle status.
@@ -129,6 +131,7 @@ final class MeterViewModel {
     private let preferences: MeterPreferences
     private var rawEV: Double?
     private var meteringTask: Task<Void, Never>?
+    private var meteringSessionID: UUID?
 
     convenience init(source: LightSource) {
         self.init(source: source, preferences: MeterPreferences(defaults: nil))
@@ -158,8 +161,12 @@ final class MeterViewModel {
             // Apply the chosen metering pattern to the fresh session so the first
             // read already meters the right point.
             applyMeteringPattern()
+            let sessionID = UUID()
+            meteringSessionID = sessionID
             meteringTask = Task { [weak self] in
+                var receivedReading = false
                 for await reading in stream {
+                    receivedReading = true
                     // Re-bind self each iteration so the loop doesn't retain the
                     // view-model across suspension points (avoids a retain cycle
                     // via the stored `meteringTask`).
@@ -169,12 +176,16 @@ final class MeterViewModel {
                     self.latestReading = reading
                     self.rawEV = ev
                 }
-                // The stream can finish on its own — e.g. capture configuration
-                // fails because no camera is available. Reset status so the UI
-                // doesn't stay stuck on the metering screen and a later start()
-                // isn't blocked by the guard above.
-                if let self, self.status == .metering {
-                    self.status = .idle
+                // A stream that ends before capture emits anything means the
+                // camera could not be configured. A stream that had produced
+                // readings ending later returns to the ordinary idle state.
+                // stop() changes status before cancellation reaches this point,
+                // so an explicit stop always remains idle.
+                if let self,
+                   self.status == .metering,
+                   self.meteringSessionID == sessionID {
+                    self.status = receivedReading ? .idle : .unavailable
+                    self.meteringSessionID = nil
                 }
             }
         }
@@ -182,6 +193,7 @@ final class MeterViewModel {
 
     /// Stops metering and returns to idle. Safe to call when not metering.
     func stop() {
+        meteringSessionID = nil
         meteringTask?.cancel()
         meteringTask = nil
         source.stop()
