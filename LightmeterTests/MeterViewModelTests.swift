@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import CoreGraphics
 @testable import Lightmeter
 
 /// `MeterViewModel` driven by a fake `LightSource` — no camera involved.
@@ -332,6 +333,122 @@ struct MeterViewModelTests {
         vm.setMode(.shutterPriority)
         #expect(vm.boundComponent == .iso)
     }
+
+    // MARK: - Metering pattern
+
+    /// Center-weighted average is the default: no spot is placed, and the source
+    /// is left on the whole-frame read until the photographer asks for a spot.
+    @Test func averageIsTheDefaultPattern() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        #expect(vm.pattern == .average)
+        #expect(vm.spot == nil)
+    }
+
+    /// Tapping the preview to place a spot flips the pattern to spot and routes
+    /// the tapped point to the source as its AE region of interest.
+    @Test func placingASpotSwitchesToSpotAndRoutesThePoint() {
+        let source = FakeLightSource()
+        let vm = MeterViewModel(source: source)
+
+        let point = CGPoint(x: 0.25, y: 0.75)
+        vm.placeSpot(at: point)
+
+        #expect(vm.pattern == .spot)
+        #expect(vm.spot == point)
+        #expect(source.lastExposurePoint == point)
+    }
+
+    /// Placing another spot moves the region of interest to the new point.
+    @Test func placingANewSpotRoutesTheNewPoint() {
+        let source = FakeLightSource()
+        let vm = MeterViewModel(source: source)
+
+        vm.placeSpot(at: CGPoint(x: 0.2, y: 0.2))
+        let highlight = CGPoint(x: 0.8, y: 0.3)
+        vm.placeSpot(at: highlight)
+
+        #expect(vm.spot == highlight)
+        #expect(source.lastExposurePoint == highlight)
+    }
+
+    /// Points outside the frame (e.g. a tap on the letterboxed edge) are clamped
+    /// into the valid `[0, 1]` device range before reaching the camera.
+    @Test func placingASpotClampsToTheDeviceRange() {
+        let source = FakeLightSource()
+        let vm = MeterViewModel(source: source)
+
+        vm.placeSpot(at: CGPoint(x: -0.4, y: 1.6))
+
+        #expect(vm.spot == CGPoint(x: 0, y: 1))
+        #expect(source.lastExposurePoint == CGPoint(x: 0, y: 1))
+    }
+
+    /// Switching back to average resets the source to the whole-frame read.
+    @Test func switchingToAverageRoutesTheWholeFrame() {
+        let source = FakeLightSource()
+        let vm = MeterViewModel(source: source)
+        vm.placeSpot(at: CGPoint(x: 0.3, y: 0.3))
+
+        vm.setPattern(.average)
+
+        #expect(vm.pattern == .average)
+        #expect(source.lastExposurePoint == nil)
+        // The average reset is a real routed call, not the empty initial state.
+        #expect(source.exposurePointCallCount == 2)
+    }
+
+    /// Switching to spot with no prior spot defaults the region of interest to the
+    /// frame center, so there is always a point to meter and show a reticle at.
+    @Test func switchingToSpotWithNoPriorSpotDefaultsToCenter() {
+        let source = FakeLightSource()
+        let vm = MeterViewModel(source: source)
+
+        vm.setPattern(.spot)
+
+        #expect(vm.spot == CGPoint(x: 0.5, y: 0.5))
+        #expect(source.lastExposurePoint == CGPoint(x: 0.5, y: 0.5))
+    }
+
+    /// Re-selecting the active pattern is a no-op — it neither re-routes nor
+    /// disturbs the placed spot.
+    @Test func reselectingTheActivePatternDoesNothing() {
+        let source = FakeLightSource()
+        let vm = MeterViewModel(source: source)
+        vm.placeSpot(at: CGPoint(x: 0.4, y: 0.6))
+        let callsAfterPlacing = source.exposurePointCallCount
+
+        vm.setPattern(.spot)
+
+        #expect(source.exposurePointCallCount == callsAfterPlacing)
+    }
+
+    /// `togglePattern()` flips between average and spot — the single control.
+    @Test func togglePatternSwitchesBothWays() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        vm.togglePattern()
+        #expect(vm.pattern == .spot)
+        vm.togglePattern()
+        #expect(vm.pattern == .average)
+    }
+
+    /// A spot placed before metering starts is applied to the source when metering
+    /// begins, so the first session already meters the chosen point.
+    @Test func startAppliesTheCurrentPatternToTheSource() async {
+        let source = FakeLightSource()
+        let vm = MeterViewModel(source: source)
+        let point = CGPoint(x: 0.6, y: 0.4)
+        vm.placeSpot(at: point)
+        let callsBeforeStart = source.exposurePointCallCount
+
+        await vm.start()
+
+        // start() must route the point afresh — not merely leave the value
+        // placeSpot(at:) already set — so the new session meters it from the off.
+        #expect(source.exposurePointCallCount == callsBeforeStart + 1)
+        #expect(source.lastExposurePoint == point)
+    }
+
+    // MARK: - Priority mode (continued)
 
     /// In shutter-priority the shutter is a dial-able input: stepping it re-solves
     /// the aperture live. A slower shutter (more light) stops the aperture down.

@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Observation
 
@@ -75,6 +76,14 @@ final class MeterViewModel {
     /// at a time — binding a new leg replaces the old.
     private(set) var boundComponent: ExposureComponent?
 
+    /// How the frame is metered: center-weighted whole-frame average (the
+    /// default) or a tap-placed spot.
+    private(set) var pattern: MeteringPattern = .average
+
+    /// The placed spot as a normalized device point in `[0, 1] × [0, 1]`, or
+    /// `nil` before any spot has been placed. Only meaningful in `.spot`.
+    private(set) var spot: CGPoint?
+
     private let source: LightSource
     private var meteringTask: Task<Void, Never>?
 
@@ -98,6 +107,9 @@ final class MeterViewModel {
 
             status = .metering
             let stream = source.start()
+            // Apply the chosen metering pattern to the fresh session so the first
+            // read already meters the right point.
+            applyMeteringPattern()
             meteringTask = Task { [weak self] in
                 for await reading in stream {
                     // Re-bind self each iteration so the loop doesn't retain the
@@ -162,6 +174,60 @@ final class MeterViewModel {
     /// Toggles between aperture- and shutter-priority — the single mode control.
     func toggleMode() {
         setMode(mode.toggled)
+    }
+
+    // MARK: - Metering pattern
+
+    /// Switches the metering pattern and routes the resulting region of interest
+    /// to the source. Selecting the active pattern is a no-op. Choosing spot with
+    /// no prior spot defaults it to the frame center so there is always a point to
+    /// meter.
+    func setPattern(_ newPattern: MeteringPattern) {
+        guard pattern != newPattern else { return }
+        pattern = newPattern
+        if newPattern == .spot, spot == nil {
+            spot = .frameCenter
+        }
+        applyMeteringPattern()
+    }
+
+    /// Toggles between average and spot — the single metering-pattern control.
+    func togglePattern() {
+        setPattern(pattern.toggled)
+    }
+
+    /// Places the spot at a normalized device point (from the preview layer's
+    /// coordinate conversion), switching to spot metering and routing the point —
+    /// clamped into the valid `[0, 1]` range — to the source's AE region of
+    /// interest.
+    func placeSpot(at point: CGPoint) {
+        pattern = .spot
+        spot = Self.clampedToFrame(point)
+        applyMeteringPattern()
+    }
+
+    /// The region of interest the current pattern meters: `nil` (whole-frame
+    /// average) for `.average`, or the placed spot (defaulting to center) for
+    /// `.spot`.
+    private var meteringPoint: CGPoint? {
+        switch pattern {
+        case .average: return nil
+        case .spot: return spot ?? .frameCenter
+        }
+    }
+
+    /// Routes the current pattern's region of interest to the source.
+    private func applyMeteringPattern() {
+        source.setExposurePointOfInterest(meteringPoint)
+    }
+
+    /// Clamps a normalized point into the `[0, 1] × [0, 1]` device range so a tap
+    /// on a letterboxed edge can't push the region of interest off the frame.
+    private static func clampedToFrame(_ point: CGPoint) -> CGPoint {
+        CGPoint(
+            x: min(max(point.x, 0), 1),
+            y: min(max(point.y, 0), 1)
+        )
     }
 
     // MARK: - Dial binding

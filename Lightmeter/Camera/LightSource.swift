@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 // MARK: - Camera / LightSource (thin, hand-validated edge)
@@ -5,9 +6,9 @@ import Foundation
 // The `LightSource` protocol abstracts the source of exposure metadata so the
 // view-model can be driven by a fake in tests. The production implementation
 // (`CameraLightSource`) wraps AVFoundation: it requests camera permission,
-// configures the capture session, runs continuous auto-exposure, and streams
-// ISO / exposureDuration / aperture. Later it will set the AE region of interest
-// for spot metering (#6).
+// configures the capture session, runs continuous auto-exposure, streams
+// ISO / exposureDuration / aperture, and aims the AE region of interest for spot
+// metering.
 //
 // This layer is intentionally NOT unit-tested — mocking AVFoundation buys little
 // and costs a lot; it is validated by hand on-device. The seam that IS tested is
@@ -50,4 +51,15 @@ protocol LightSource: AnyObject {
 
     /// Stops metering and finishes the stream returned by the matching `start()`.
     func stop()
+
+    /// Aims the camera's auto-exposure region of interest.
+    ///
+    /// Pass a normalized device point in `[0, 1] × [0, 1]` (as produced by the
+    /// preview layer's `captureDevicePointConverted(fromLayerPoint:)`) to bias
+    /// metering toward that point for spot metering, or `nil` to reset to a
+    /// center-weighted whole-frame average.
+    ///
+    /// Safe to call before `start()`: conformers apply the point once the capture
+    /// device is configured and re-apply it for the current session.
+    func setExposurePointOfInterest(_ point: CGPoint?)
 }

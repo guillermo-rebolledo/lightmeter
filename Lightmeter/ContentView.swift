@@ -21,8 +21,13 @@ struct ContentView: View {
 
             switch model.status {
             case .idle, .metering:
-                CameraPreviewView(session: camera.session)
-                    .ignoresSafeArea()
+                CameraPreviewView(
+                    session: camera.session,
+                    spot: model.spot,
+                    isSpotActive: model.pattern == .spot,
+                    onPlaceSpot: { model.placeSpot(at: $0) }
+                )
+                .ignoresSafeArea()
                 meterOverlay
             case .denied:
                 DeniedView()
@@ -41,6 +46,10 @@ struct ContentView: View {
             Spacer()
             VStack(spacing: 16) {
                 evReadout
+                MeteringPatternToggle(
+                    pattern: model.pattern,
+                    onSelect: { model.setPattern($0) }
+                )
                 PriorityModeToggle(
                     mode: model.mode,
                     onSelect: { model.setMode($0) }
