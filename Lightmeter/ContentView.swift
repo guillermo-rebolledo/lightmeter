@@ -1,25 +1,87 @@
 import SwiftUI
+import UIKit
 
-/// Placeholder scaffold screen. Replaced by the live camera meter in ticket #3.
+/// The meter screen: a live camera preview as the hero, with the scene's
+/// EV@ISO100 read out over it and updating in real time. Falls back to a graceful
+/// denied state when camera access isn't granted.
 struct ContentView: View {
+    @State private var camera: CameraLightSource
+    @State private var model: MeterViewModel
+
+    init() {
+        let camera = CameraLightSource()
+        _camera = State(initialValue: camera)
+        _model = State(initialValue: MeterViewModel(source: camera))
+    }
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            VStack(spacing: 12) {
-                Image(systemName: "camera.aperture")
-                    .font(.system(size: 56, weight: .thin))
-                    .foregroundStyle(.white)
-
-                Text(AppInfo.name)
-                    .font(.largeTitle.weight(.semibold))
-                    .foregroundStyle(.white)
-
-                Text(AppInfo.tagline)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+            switch model.status {
+            case .idle, .metering:
+                CameraPreviewView(session: camera.session)
+                    .ignoresSafeArea()
+                evReadout
+            case .denied:
+                DeniedView()
             }
         }
+        .task { await model.start() }
+        .onDisappear { model.stop() }
+    }
+
+    /// The EV@ISO100 readout, floated over the preview near the bottom edge.
+    private var evReadout: some View {
+        VStack {
+            Spacer()
+            VStack(spacing: 4) {
+                Text("EV @ ISO 100")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                    .tracking(1.5)
+
+                Text(model.ev.map { String(format: "%.1f", $0) } ?? "—")
+                    .font(.system(size: 68, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .contentTransition(.numericText())
+            }
+            .padding(.vertical, 18)
+            .padding(.horizontal, 32)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .padding(.bottom, 56)
+        }
+        .animation(.snappy, value: model.ev)
+    }
+}
+
+/// Shown when camera access is denied or restricted, with a route to Settings.
+private struct DeniedView: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "video.slash")
+                .font(.system(size: 52, weight: .thin))
+                .foregroundStyle(.white)
+
+            Text("Camera access needed")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(.white)
+
+            Text("Lightmeter reads the light from your camera to meter exposure. Enable camera access in Settings to start metering.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+
+            if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                Link("Open Settings", destination: settingsURL)
+                    .font(.body.weight(.semibold))
+                    .padding(.top, 4)
+            }
+        }
+        .padding()
     }
 }
 

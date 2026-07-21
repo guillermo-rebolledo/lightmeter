@@ -4,12 +4,48 @@ import Foundation
 //
 // The `LightSource` protocol abstracts the source of exposure metadata so the
 // view-model can be driven by a fake in tests. The production implementation
-// (arriving in ticket #3) wraps AVFoundation: it configures the capture session,
-// runs auto-exposure, streams ISO / exposureDuration / aperture, and sets the AE
-// region of interest for spot metering (#6).
+// (`CameraLightSource`) wraps AVFoundation: it requests camera permission,
+// configures the capture session, runs continuous auto-exposure, and streams
+// ISO / exposureDuration / aperture. Later it will set the AE region of interest
+// for spot metering (#6).
 //
 // This layer is intentionally NOT unit-tested — mocking AVFoundation buys little
-// and costs a lot; it is validated by hand on-device.
+// and costs a lot; it is validated by hand on-device. The seam that IS tested is
+// `MeterViewModel`, driven by a fake conforming to this protocol.
 
-// Protocol + AVFoundation adapter land in ticket #3.
-enum CameraModule {}
+/// Whether the app is allowed to read the camera, mirroring the camera
+/// permission lifecycle without leaking AVFoundation into the view-model.
+enum LightSourceAuthorization: Sendable {
+    /// The user has granted camera access.
+    case authorized
+    /// The user has denied or restricted camera access; the UI shows a graceful
+    /// denied state rather than a live preview.
+    case denied
+}
+
+/// A source of live exposure-metadata readings for the meter.
+///
+/// Conformers own their own lifecycle: `requestAuthorization()` triggers the
+/// permission flow (a no-op returning `.authorized` for a fake) and `start()`
+/// begins metering, returning a **fresh** stream of readings for that session.
+/// `stop()` ends metering and finishes the stream returned by the matching
+/// `start()`.
+///
+/// `start()` vends a new stream each call rather than exposing one shared stream,
+/// because `AsyncStream` is single-consumer and iterable only once — a stop →
+/// start cycle needs a new stream or the readings never resume.
+///
+/// Deliberately not `@MainActor`: the real camera does its capture work on its own
+/// queues. `MeterViewModel` (which *is* `@MainActor`) consumes the stream and
+/// publishes UI state on the main actor.
+protocol LightSource: AnyObject {
+    /// Requests permission to read the camera, returning the resulting status.
+    func requestAuthorization() async -> LightSourceAuthorization
+
+    /// Begins auto-exposure metering and returns a fresh stream of readings for
+    /// this session. The stream finishes when `stop()` is called.
+    func start() -> AsyncStream<LightReading>
+
+    /// Stops metering and finishes the stream returned by the matching `start()`.
+    func stop()
+}
