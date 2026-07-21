@@ -15,14 +15,22 @@ struct ContentView: View {
     @State private var preferences: MeterPreferences
     @State private var tour: GuidedTourController
     @State private var path: [Destination] = []
+    /// Advisories frozen for the tour's lifetime so their height cannot drift.
+    @State private var tourAdvisories: [ExposureAdvisory]?
 
     init(defaults: UserDefaults = .standard) {
         let camera = CameraLightSource()
         let preferences = MeterPreferences(defaults: defaults)
+        let model = MeterViewModel(source: camera, preferences: preferences)
         _camera = State(initialValue: camera)
-        _model = State(initialValue: MeterViewModel(source: camera, preferences: preferences))
+        _model = State(initialValue: model)
         _preferences = State(initialValue: preferences)
-        _tour = State(initialValue: GuidedTourController(preferences: preferences))
+        _tour = State(
+            initialValue: GuidedTourController(
+                preferences: preferences,
+                model: model
+            )
+        )
     }
 
     var body: some View {
@@ -46,12 +54,42 @@ struct ContentView: View {
                     CameraStatusView(status: .unavailable)
                 }
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink(value: Destination.settings) {
-                        Label("Settings", systemImage: "gearshape")
+            // Own the gear in content space (not ToolbarItem) so the tour
+            // anchor and the tappable control share one resolved frame.
+            // Avoid `.offset` — it moves pixels without moving layout bounds,
+            // which leaves the spotlight stranded away from the gear.
+            .overlay(alignment: .topTrailing) {
+                NavigationLink(value: Destination.settings) {
+                    Label("Settings", systemImage: "gearshape")
+                        .labelStyle(.iconOnly)
+                        .foregroundStyle(.tint)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .tint(.yellow)
+                .guidedTourAnchor(.settings)
+                .padding(.top, 4)
+                .padding(.trailing, 8)
+            }
+            // Resolve tour anchors in the same full-screen space the spotlight
+            // draws into. An outer overlay under-reports Y by the top safe area,
+            // which shifts every cutout upward by roughly one control row.
+            .overlayPreferenceValue(GuidedTourAnchorPreferenceKey.self) { anchors in
+                GeometryReader { geometry in
+                    if tour.isPresented,
+                       let step = tour.currentStep,
+                       let anchor = anchors[step] {
+                        GuidedTourOverlay(
+                            step: step,
+                            targetFrame: geometry[anchor],
+                            progressLabel: tour.progressLabel,
+                            onAdvance: tour.advance,
+                            onSkip: tour.skip
+                        )
                     }
                 }
+                .ignoresSafeArea()
             }
             .navigationDestination(for: Destination.self) { destination in
                 switch destination {
@@ -66,21 +104,6 @@ struct ContentView: View {
             .tint(.yellow)
             .task { await model.start() }
             .onDisappear { model.stop() }
-        }
-        .overlayPreferenceValue(GuidedTourAnchorPreferenceKey.self) { anchors in
-            GeometryReader { geometry in
-                if tour.isPresented,
-                   let step = tour.currentStep,
-                   let anchor = anchors[step] {
-                    GuidedTourOverlay(
-                        step: step,
-                        targetFrame: geometry[anchor],
-                        progressLabel: tour.progressLabel,
-                        onAdvance: tour.advance,
-                        onSkip: tour.skip
-                    )
-                }
-            }
         }
         .onChange(of: model.status, initial: true) {
             updateTourState()
@@ -112,21 +135,31 @@ struct ContentView: View {
                         isBound: model.isCompensationDialBound,
                         onSelect: model.bindCompensationDial
                     )
+                    .guidedTourAnchor(.compensation)
                 }
-                AdvisoriesView(advisories: model.advisories)
+                // Freeze advisory height for the tour so live warnings cannot
+                // shove spotlight targets between steps.
+                AdvisoriesView(advisories: tourAdvisories ?? model.advisories)
+                    .opacity(tour.isPresented ? 0 : 1)
+                    .allowsHitTesting(tour.isPresented == false)
+                    .accessibilityHidden(tour.isPresented)
                 MeteringPatternToggle(
                     pattern: model.pattern,
                     onSelect: { model.setPattern($0) }
                 )
-                PriorityModeToggle(
-                    mode: model.mode,
-                    onSelect: { model.setMode($0) }
-                )
-                ExposureChipsView(
-                    triangle: model.triangle,
-                    boundComponent: model.boundComponent,
-                    onSelect: { model.bindDial(to: $0) }
-                )
+                .guidedTourAnchor(.meteringPattern)
+                VStack(spacing: 16) {
+                    PriorityModeToggle(
+                        mode: model.mode,
+                        onSelect: { model.setMode($0) }
+                    )
+                    ExposureChipsView(
+                        triangle: model.triangle,
+                        boundComponent: model.boundComponent,
+                        onSelect: { model.bindDial(to: $0) }
+                    )
+                }
+                .guidedTourAnchor(.priorityAndChips)
             }
             .padding(20)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
@@ -134,6 +167,7 @@ struct ContentView: View {
 
             dial
                 .padding(.top, 8)
+                .guidedTourAnchor(.arcDial)
         }
         .padding(.bottom, 44)
     }
@@ -174,6 +208,9 @@ struct ContentView: View {
             isMeterReady: model.latestReading != nil,
             isVoiceOverRunning: isVoiceOverRunning
         )
+        if tour.isPresented, tourAdvisories == nil {
+            tourAdvisories = model.advisories
+        }
         if path.isEmpty == false {
             path.removeLast()
         }
@@ -185,7 +222,15 @@ struct ContentView: View {
             isMeterReady: model.latestReading != nil,
             isVoiceOverRunning: isVoiceOverRunning
         )
+        if tour.isPresented {
+            if tourAdvisories == nil {
+                tourAdvisories = model.advisories
+            }
+        } else {
+            tourAdvisories = nil
+        }
     }
+
 }
 
 #Preview {

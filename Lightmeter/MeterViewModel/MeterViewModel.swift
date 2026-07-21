@@ -409,6 +409,37 @@ final class MeterViewModel {
         }
     }
 
+    // MARK: - Temporary UI flows
+
+    /// Captures every photographer-controlled value a temporary flow may change.
+    func captureState() -> MeterViewModelState {
+        MeterViewModelState(
+            isFrozen: isFrozen,
+            mode: mode,
+            iso: iso,
+            aperture: aperture,
+            shutter: shutter,
+            compensation: compensation,
+            dialTarget: dialTarget,
+            pattern: pattern,
+            spot: spot
+        )
+    }
+
+    /// Restores a previously captured setup and reapplies its metering region.
+    func restoreState(_ state: MeterViewModelState) {
+        isFrozen = state.isFrozen && latestReading != nil
+        mode = state.mode
+        iso = state.iso
+        aperture = state.aperture
+        shutter = state.shutter
+        compensation = state.compensation
+        dialTarget = state.dialTarget
+        pattern = state.pattern
+        spot = state.spot
+        applyMeteringPattern()
+    }
+
     /// The current set value of a leg — its live stored input. The dial is only
     /// ever bound to an editable (set) leg, so this is always the value it drives.
     private func value(for component: ExposureComponent) -> Double {
