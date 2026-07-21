@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 @testable import Lightmeter
 
@@ -12,6 +13,19 @@ final class FakeLightSource: LightSource {
 
     private(set) var didStart = false
     private(set) var didStop = false
+
+    /// Every exposure point of interest the view-model has routed, in order. A
+    /// `nil` entry is average (center-weighted whole frame); a non-`nil` entry is
+    /// a spot at that normalized device point.
+    private(set) var exposurePoints: [CGPoint?] = []
+
+    /// How many times an exposure point was routed — distinguishes "reset to
+    /// average" (a routed `nil`) from "never routed" (empty).
+    var exposurePointCallCount: Int { exposurePoints.count }
+
+    /// The most recently routed exposure point (flattened): `nil` means the last
+    /// route was average, or that nothing has been routed yet.
+    var lastExposurePoint: CGPoint? { exposurePoints.last ?? nil }
 
     private var continuation: AsyncStream<LightReading>.Continuation?
 
@@ -30,6 +44,10 @@ final class FakeLightSource: LightSource {
         didStop = true
         continuation?.finish()
         continuation = nil
+    }
+
+    func setExposurePointOfInterest(_ point: CGPoint?) {
+        exposurePoints.append(point)
     }
 
     /// Pushes a reading into the current session's stream, as the real camera

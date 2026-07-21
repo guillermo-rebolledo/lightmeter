@@ -23,6 +23,14 @@ final class CameraLightSource: NSObject, LightSource {
     private var sampler: ReadingSampler?
     private var isConfigured = false
 
+    /// The capture device once configured, retained so the AE region of interest
+    /// can be re-aimed for spot metering. Touched only on `sessionQueue`.
+    private var device: AVCaptureDevice?
+
+    /// The exposure point of interest to keep the device aimed at — center for
+    /// whole-frame average, or the placed spot. Touched only on `sessionQueue`.
+    private var exposurePoint = CGPoint.frameCenter
+
     /// The continuation for the current session's stream. Touched only on
     /// `sessionQueue`, so it needs no further synchronization here.
     private var activeContinuation: AsyncStream<LightReading>.Continuation?
@@ -82,7 +90,33 @@ final class CameraLightSource: NSObject, LightSource {
         }
     }
 
+    func setExposurePointOfInterest(_ point: CGPoint?) {
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            // AVFoundation has no distinct whole-frame-average metering mode; the
+            // only knob is the AE point of interest. Average (`nil`) aims it at
+            // center for a center-weighted read — the closest the API gets to
+            // "whole frame" — while spot aims it at the placed point.
+            self.exposurePoint = point ?? .frameCenter
+            self.configureIfNeeded()
+            self.applyExposurePoint()
+        }
+    }
+
     // MARK: - Configuration
+
+    /// Aims the device's continuous auto-exposure at `exposurePoint`. Runs on
+    /// `sessionQueue`; a no-op until the device is configured or if the device
+    /// doesn't support a settable point of interest.
+    private func applyExposurePoint() {
+        guard let device, device.isExposurePointOfInterestSupported else { return }
+        guard (try? device.lockForConfiguration()) != nil else { return }
+        device.exposurePointOfInterest = exposurePoint
+        if device.isExposureModeSupported(.continuousAutoExposure) {
+            device.exposureMode = .continuousAutoExposure
+        }
+        device.unlockForConfiguration()
+    }
 
     private func configureIfNeeded() {
         guard !isConfigured else { return }
@@ -99,6 +133,7 @@ final class CameraLightSource: NSObject, LightSource {
             return
         }
         session.addInput(input)
+        self.device = device
 
         // Continuous auto-exposure so the streamed metadata tracks the live scene.
         if (try? device.lockForConfiguration()) != nil {
@@ -117,6 +152,8 @@ final class CameraLightSource: NSObject, LightSource {
         }
 
         isConfigured = true
+        // Aim AE at the current point (center by default) now the device exists.
+        applyExposurePoint()
     }
 }
 
