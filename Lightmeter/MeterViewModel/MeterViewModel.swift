@@ -20,12 +20,6 @@ import Observation
 @MainActor
 @Observable
 final class MeterViewModel {
-    /// The single control currently driven by the shared arc dial.
-    private enum DialTarget: Equatable {
-        case component(ExposureComponent)
-        case compensation
-    }
-
     /// Where the meter is in its lifecycle, driving which UI is shown.
     enum Status: Equatable {
         /// Not yet started (or stopped).
@@ -401,7 +395,11 @@ final class MeterViewModel {
     private static let compensationStops = (-9...9).map { Double($0) / 3 }
 
     private static func compensationDialLabel(_ value: Double) -> String {
-        String(format: "%+.1f", value)
+        value.formatted(
+            .number
+                .sign(strategy: .always())
+                .precision(.fractionLength(1))
+        )
     }
 
     private static func compensationLabel(_ value: Double) -> String {

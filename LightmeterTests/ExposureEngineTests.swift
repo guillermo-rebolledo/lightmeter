@@ -201,34 +201,25 @@ struct ExposureEngineTests {
 
     // MARK: - EV compensation
 
-    /// Positive compensation deliberately overexposes: at fixed ISO and
-    /// aperture, +1 EV doubles the solved exposure duration by one stop.
-    @Test func positiveCompensationShiftsTheSolveTowardOverexposure() {
+    /// At fixed ISO and aperture, positive compensation doubles the duration
+    /// toward overexposure while negative compensation halves it.
+    @Test(arguments: [
+        (compensation: 1.0, expectedShutter: "1/60"),
+        (compensation: -1.0, expectedShutter: "1/250"),
+    ])
+    func compensationSignShiftsTheSolveInTheExpectedDirection(
+        _ example: (compensation: Double, expectedShutter: String)
+    ) {
         let triangle = ExposureEngine.solvedTriangle(
             mode: .aperturePriority,
             evAtISO100: 15,
-            compensation: 1,
+            compensation: example.compensation,
             iso: 100,
             aperture: 16,
             shutter: 1.0 / 125
         )
 
-        #expect(triangle.shutter?.label == "1/60")
-    }
-
-    /// Negative compensation deliberately underexposes: at fixed ISO and
-    /// aperture, −1 EV halves the solved exposure duration by one stop.
-    @Test func negativeCompensationShiftsTheSolveTowardUnderexposure() {
-        let triangle = ExposureEngine.solvedTriangle(
-            mode: .aperturePriority,
-            evAtISO100: 15,
-            compensation: -1,
-            iso: 100,
-            aperture: 16,
-            shutter: 1.0 / 125
-        )
-
-        #expect(triangle.shutter?.label == "1/250")
+        #expect(triangle.shutter?.label == example.expectedShutter)
     }
 
     /// Compensation is additive in stop-space: two successive nudges have the

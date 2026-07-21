@@ -273,6 +273,17 @@ struct MeterViewModelTests {
         #expect(vm.compensationLabel == "+1.0 EV")
     }
 
+    /// The public setter cannot move compensation beyond the dial's ±3 EV ends.
+    @Test func compensationClampsToTheDialBounds() {
+        let vm = MeterViewModel(source: FakeLightSource())
+
+        vm.setCompensation(4)
+        #expect(vm.compensation == 3)
+
+        vm.setCompensation(-4)
+        #expect(vm.compensation == -3)
+    }
+
     // MARK: - Dial binding
 
     /// Tapping a chip binds the dial to that leg; nothing is bound to start.
