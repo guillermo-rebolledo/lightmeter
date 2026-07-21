@@ -17,10 +17,10 @@ struct ArcDialView: View {
 
     /// The detent labels laid out along the arc.
     let labels: [String]
-    /// The stop the fixed indicator currently points at.
-    let selectedIndex: Int
-    /// The leg being dialed, e.g. `"Aperture"` — announced to VoiceOver.
-    let caption: String
+    /// The stop the fixed indicator currently points at, or `nil` while unbound.
+    let selectedIndex: Int?
+    /// The leg being dialed, e.g. `"Aperture"` — announced to VoiceOver when bound.
+    let caption: String?
     /// Reports a newly selected stop index (already clamped to `stops`).
     let onSelect: (Int) -> Void
 
@@ -52,7 +52,12 @@ struct ArcDialView: View {
 
     /// The effective dial position: the live drag while dragging, else the
     /// committed selection.
-    private var position: CGFloat { dragPosition ?? CGFloat(selectedIndex) }
+    private var position: CGFloat { dragPosition ?? CGFloat(selectedIndex ?? 0) }
+    /// Whether the dial has a complete target and should reveal its visual content.
+    private var isBound: Bool {
+        guard let selectedIndex, caption != nil else { return false }
+        return labels.indices.contains(selectedIndex)
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -71,16 +76,23 @@ struct ArcDialView: View {
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .mask(edgeFade)
+            .transaction { $0.animation = nil }
+            .opacity(isBound ? 1 : 0)
+            .animation(.easeOut(duration: 0.15), value: isBound)
 
-            indicator.position(x: centerX, y: 8)
+            indicator
+                .opacity(isBound ? 1 : 0)
+                .position(x: centerX, y: 8)
         }
         .frame(height: Self.layoutHeight)
         .contentShape(Rectangle())
         .gesture(dialGesture)
         .accessibilityElement()
-        .accessibilityLabel(caption)
-        .accessibilityValue(labels[safe: selectedIndex] ?? "")
+        .accessibilityHidden(isBound == false)
+        .accessibilityLabel(caption ?? "")
+        .accessibilityValue(selectedIndex.flatMap { labels[safe: $0] } ?? "")
         .accessibilityAdjustableAction { direction in
+            guard let selectedIndex else { return }
             switch direction {
             case .increment: onSelect(min(selectedIndex + 1, labels.count - 1))
             case .decrement: onSelect(max(selectedIndex - 1, 0))
@@ -143,6 +155,8 @@ struct ArcDialView: View {
     private var dialGesture: some Gesture {
         DragGesture(minimumDistance: 1)
             .onChanged { value in
+                guard let selectedIndex, labels.indices.contains(selectedIndex) else { return }
+
                 // Drag begins: anchor to the current selection so the first
                 // movement is measured from — and ticks relative to — where the
                 // dial actually sits, not a stale index from a prior binding.
@@ -181,6 +195,7 @@ struct ArcDialView: View {
 
     /// The window of stop indices worth drawing around the current position.
     private var visibleIndices: [Int] {
+        guard labels.isEmpty == false else { return [] }
         let center = Int(position.rounded())
         let lower = max(center - visibleSpan, 0)
         let upper = min(center + visibleSpan, labels.count - 1)
