@@ -40,6 +40,10 @@ final class MeterViewModel {
     /// reading.
     private(set) var ev: Double?
 
+    /// Whether the current reading is held while incoming source emissions are
+    /// ignored. A reading must exist before the meter can be frozen.
+    private(set) var isFrozen = false
+
     /// Which leg the photographer holds fixed and which the engine solves.
     /// Aperture-priority (locks aperture, solves shutter) is the v1 default.
     private(set) var mode: PriorityMode = .aperturePriority
@@ -63,6 +67,17 @@ final class MeterViewModel {
     /// stop. The solved leg is `nil` until the scene has been metered.
     var triangle: ExposureTriangle {
         ExposureEngine.solvedTriangle(
+            mode: mode,
+            evAtISO100: ev,
+            iso: iso,
+            aperture: aperture,
+            shutter: shutter
+        )
+    }
+
+    /// Safety guidance derived from the current unsnapped solve.
+    var advisories: [ExposureAdvisory] {
+        ExposureEngine.advisories(
             mode: mode,
             evAtISO100: ev,
             iso: iso,
@@ -116,6 +131,7 @@ final class MeterViewModel {
                     // view-model across suspension points (avoids a retain cycle
                     // via the stored `meteringTask`).
                     guard let self else { break }
+                    guard self.isFrozen == false else { continue }
                     guard let ev = ExposureEngine.evAtISO100(for: reading) else { continue }
                     self.latestReading = reading
                     self.ev = ev
@@ -139,6 +155,14 @@ final class MeterViewModel {
         if status == .metering {
             status = .idle
         }
+        isFrozen = false
+    }
+
+    /// Holds the latest valid reading, or resumes accepting live source updates.
+    /// Before the first reading there is nothing to hold, so this is a no-op.
+    func toggleFreeze() {
+        guard latestReading != nil || isFrozen else { return }
+        isFrozen.toggle()
     }
 
     /// Sets the photographer's ISO. The triangle re-solves its solved leg from
