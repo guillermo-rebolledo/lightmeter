@@ -15,6 +15,8 @@ struct ContentView: View {
     @State private var preferences: MeterPreferences
     @State private var tour: GuidedTourController
     @State private var path: [Destination] = []
+    /// Advisories frozen for the tour's lifetime so their height cannot drift.
+    @State private var tourAdvisories: [ExposureAdvisory]?
 
     init(defaults: UserDefaults = .standard) {
         let camera = CameraLightSource()
@@ -57,8 +59,37 @@ struct ContentView: View {
                     NavigationLink(value: Destination.settings) {
                         Label("Settings", systemImage: "gearshape")
                     }
-                    .guidedTourAnchor(.settings)
                 }
+            }
+            // Toolbar preferences resolve in a different space; mirror the gear
+            // with a non-interactive content anchor so step 6 can spotlight it.
+            .overlay(alignment: .topTrailing) {
+                Color.clear
+                    .frame(width: 44, height: 44)
+                    .guidedTourAnchor(.settings)
+                    .padding(.top, 4)
+                    .padding(.trailing, 12)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+            // Resolve tour anchors in the same full-screen space the spotlight
+            // draws into. An outer overlay under-reports Y by the top safe area,
+            // which shifts every cutout upward by roughly one control row.
+            .overlayPreferenceValue(GuidedTourAnchorPreferenceKey.self) { anchors in
+                GeometryReader { geometry in
+                    if tour.isPresented,
+                       let step = tour.currentStep,
+                       let anchor = anchors[step] {
+                        GuidedTourOverlay(
+                            step: step,
+                            targetFrame: geometry[anchor],
+                            progressLabel: tour.progressLabel,
+                            onAdvance: tour.advance,
+                            onSkip: tour.skip
+                        )
+                    }
+                }
+                .ignoresSafeArea()
             }
             .navigationDestination(for: Destination.self) { destination in
                 switch destination {
@@ -73,21 +104,6 @@ struct ContentView: View {
             .tint(.yellow)
             .task { await model.start() }
             .onDisappear { model.stop() }
-        }
-        .overlayPreferenceValue(GuidedTourAnchorPreferenceKey.self) { anchors in
-            GeometryReader { geometry in
-                if tour.isPresented,
-                   let step = tour.currentStep,
-                   let anchor = anchors[step] {
-                    GuidedTourOverlay(
-                        step: step,
-                        targetFrame: geometry[anchor],
-                        progressLabel: tour.progressLabel,
-                        onAdvance: tour.advance,
-                        onSkip: tour.skip
-                    )
-                }
-            }
         }
         .onChange(of: model.status, initial: true) {
             updateTourState()
@@ -121,7 +137,12 @@ struct ContentView: View {
                     )
                     .guidedTourAnchor(.compensation)
                 }
-                AdvisoriesView(advisories: model.advisories)
+                // Freeze advisory height for the tour so live warnings cannot
+                // shove spotlight targets between steps.
+                AdvisoriesView(advisories: tourAdvisories ?? model.advisories)
+                    .opacity(tour.isPresented ? 0 : 1)
+                    .allowsHitTesting(tour.isPresented == false)
+                    .accessibilityHidden(tour.isPresented)
                 MeteringPatternToggle(
                     pattern: model.pattern,
                     onSelect: { model.setPattern($0) }
@@ -187,6 +208,9 @@ struct ContentView: View {
             isMeterReady: model.latestReading != nil,
             isVoiceOverRunning: isVoiceOverRunning
         )
+        if tour.isPresented, tourAdvisories == nil {
+            tourAdvisories = model.advisories
+        }
         if path.isEmpty == false {
             path.removeLast()
         }
@@ -198,6 +222,13 @@ struct ContentView: View {
             isMeterReady: model.latestReading != nil,
             isVoiceOverRunning: isVoiceOverRunning
         )
+        if tour.isPresented {
+            if tourAdvisories == nil {
+                tourAdvisories = model.advisories
+            }
+        } else {
+            tourAdvisories = nil
+        }
     }
 }
 
