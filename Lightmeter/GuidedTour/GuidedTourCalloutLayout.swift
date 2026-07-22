@@ -77,7 +77,11 @@ struct GuidedTourCalloutLayout: Layout {
         let sideWidth = min(max(sideRoom - gap - margin, 0), maxWidth)
         let sideFits = sideWidth >= minSideWidth
 
-        if verticalFits || !sideFits {
+        // Prefer vertical when it fits. When *neither* axis fits — a target
+        // large enough (e.g. big Dynamic Type) to crowd every side — fall back
+        // to whichever axis has more usable room so the callout overlaps as
+        // little as possible, rather than always defaulting to vertical.
+        if verticalFits || (!sideFits && verticalRoom >= sideRoom) {
             let x = clamp(
                 targetFrame.midX - (verticalWidth / 2),
                 min: bounds.minX + margin,

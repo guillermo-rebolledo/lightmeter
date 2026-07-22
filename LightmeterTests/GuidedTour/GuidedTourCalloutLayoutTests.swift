@@ -96,6 +96,25 @@ struct GuidedTourCalloutLayoutTests {
 
     // MARK: Clamping — the callout never leaves the bounds.
 
+    @Test("Oversized target with no fitting axis picks the side with more room")
+    func oversizedTargetPrefersRoomierSide() {
+        // A target so large (e.g. big Dynamic Type) that neither above/below nor
+        // a side offers a comfortable fit: room is 20pt vertically but 100pt on
+        // each side. The callout should take the roomier horizontal axis instead
+        // of defaulting to a vertical placement that lands on the target.
+        let bounds = CGRect(x: 0, y: 0, width: 844, height: 390)
+        let target = CGRect(x: 100, y: 20, width: 644, height: 350)
+
+        let frame = GuidedTourCalloutLayout.calloutFrame(
+            targetFrame: target,
+            bounds: bounds,
+            measuredHeight: fixedHeight(120)
+        )
+
+        #expect(bounds.contains(frame), "Callout must stay on screen")
+        #expect(!frame.intersects(target), "Callout must avoid the target when a side has room")
+    }
+
     @Test("Callout stays on screen even when the target sits in a corner")
     func cornerTargetStaysOnScreen() {
         let bounds = CGRect(x: 0, y: 0, width: 844, height: 390)
