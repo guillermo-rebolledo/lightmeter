@@ -1,19 +1,25 @@
 import SwiftUI
 import UIKit
 
-/// A Halide-style curved dial hugging the bottom edge: the scale's stops fan
-/// along an arc and sweep horizontally past a fixed indicator as you drag. Each
-/// stop that crosses the indicator fires a selection haptic — the detent tick
-/// that makes the dial feel mechanical. Snapping is stop-to-stop; the arc always
-/// settles on a real, dial-able mark.
+/// A Halide-style curved dial: the scale's stops fan along an arc and sweep past
+/// a fixed indicator as you drag. Each stop that crosses the indicator fires a
+/// selection haptic — the detent tick that makes the dial feel mechanical.
+/// Snapping is stop-to-stop; the arc always settles on a real, dial-able mark.
+///
+/// The dial works along either `axis`. Horizontally it hugs the bottom edge and
+/// sweeps left/right (portrait); vertically it hugs the trailing edge and sweeps
+/// up/down (landscape). The vertical layout is a mirror of the horizontal one —
+/// the arc's centre moves to the side of the apex, marks fan along the edge, and
+/// the drag reads the matching translation axis.
 ///
 /// The dial is a pure controller: `selectedIndex` and `labels` are the source of
 /// truth (owned by `MeterViewModel`), and `onSelect` reports each new detent up.
 /// A drag is expressed in continuous stop-units and rounded to the nearest stop,
 /// so the same gesture drives both the visual sweep and the reported value.
 struct ArcDialView: View {
-    /// The vertical space the dial requires, including its marks and gesture area.
-    static let layoutHeight: CGFloat = 150
+    /// The thickness the dial requires across its short axis, including marks and
+    /// gesture area — a height when horizontal, a width when vertical.
+    static let layoutThickness: CGFloat = 150
 
     /// The detent labels laid out along the arc.
     let labels: [String]
@@ -21,6 +27,8 @@ struct ArcDialView: View {
     let selectedIndex: Int?
     /// The leg being dialed, e.g. `"Aperture"` — announced to VoiceOver when bound.
     let caption: String?
+    /// The edge the dial hugs and the direction it sweeps. Defaults to horizontal.
+    var axis: Axis = .horizontal
     /// Reports a newly selected stop index (already clamped to `stops`).
     let onSelect: (Int) -> Void
 
@@ -44,7 +52,10 @@ struct ArcDialView: View {
     // tight bowl; `anglePerStop` sets how far apart the marks fan.
     private let radius: CGFloat = 900
     private let anglePerStop = 3.4 * .pi / 180
-    private let apexY: CGFloat = 34
+    /// Distance from the hugged edge to the arc's apex (the centred, selected mark).
+    private let apexInset: CGFloat = 34
+    /// Distance from the hugged edge to the fixed indicator, just outside the apex.
+    private let indicatorInset: CGFloat = 8
     /// How many stops fan out either side of centre before they clip/fade.
     private let visibleSpan = 7
     /// Drag distance (points) that advances the dial one stop.
@@ -61,17 +72,13 @@ struct ArcDialView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let centerX = geo.size.width / 2
-            let centerY = apexY + radius
+            let center = arcCenter(in: geo.size)
 
             ZStack {
                 ForEach(visibleIndices, id: \.self) { index in
                     let angle = (CGFloat(index) - position) * CGFloat(anglePerStop)
                     stopMark(index, angle: angle)
-                        .position(
-                            x: centerX + radius * sin(angle),
-                            y: centerY - radius * cos(angle)
-                        )
+                        .position(markPosition(angle: angle, around: center))
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
@@ -82,9 +89,12 @@ struct ArcDialView: View {
 
             indicator
                 .opacity(isBound ? 1 : 0)
-                .position(x: centerX, y: 8)
+                .position(indicatorPosition(in: geo.size))
         }
-        .frame(height: Self.layoutHeight)
+        .frame(
+            width: axis == .vertical ? Self.layoutThickness : nil,
+            height: axis == .horizontal ? Self.layoutThickness : nil
+        )
         .contentShape(Rectangle())
         .gesture(dialGesture)
         .accessibilityElement()
@@ -99,6 +109,43 @@ struct ArcDialView: View {
             @unknown default: break
             }
         }
+    }
+
+    // MARK: - Geometry
+
+    /// The centre of the arc's circle. It sits deep beyond the hugged edge so the
+    /// apex bulges toward the edge: below the view when horizontal, past the
+    /// trailing edge when vertical.
+    private func arcCenter(in size: CGSize) -> CGPoint {
+        switch axis {
+        case .horizontal: CGPoint(x: size.width / 2, y: apexInset + radius)
+        case .vertical: CGPoint(x: size.width - apexInset - radius, y: size.height / 2)
+        }
+    }
+
+    /// Where a mark at `angle` off centre sits on the arc. At `angle == 0` this is
+    /// the apex; positive angles fan toward higher values (right / down).
+    private func markPosition(angle: CGFloat, around center: CGPoint) -> CGPoint {
+        switch axis {
+        case .horizontal:
+            CGPoint(x: center.x + radius * sin(angle), y: center.y - radius * cos(angle))
+        case .vertical:
+            CGPoint(x: center.x + radius * cos(angle), y: center.y + radius * sin(angle))
+        }
+    }
+
+    /// The fixed indicator's anchor: just outside the apex, on the hugged edge.
+    private func indicatorPosition(in size: CGSize) -> CGPoint {
+        switch axis {
+        case .horizontal: CGPoint(x: size.width / 2, y: indicatorInset)
+        case .vertical: CGPoint(x: size.width - indicatorInset, y: size.height / 2)
+        }
+    }
+
+    /// Extra rotation so a mark's upright layout sits radially: none when the arc
+    /// centre is below (horizontal), a quarter turn when it's to the side.
+    private var markBaseRotation: Double {
+        axis == .horizontal ? 0 : .pi / 2
     }
 
     // MARK: - Marks
@@ -116,6 +163,10 @@ struct ArcDialView: View {
                               design: .rounded))
                 .monospacedDigit()
                 .fixedSize()
+                // Undo the base rotation on the label alone so numbers stay
+                // upright and readable; only the small per-stop `angle` tilt
+                // (shared with the tick) remains.
+                .rotationEffect(.radians(-markBaseRotation))
 
             Capsule()
                 .frame(width: isSelected ? 2 : 1, height: isSelected ? 14 : 9)
@@ -123,20 +174,21 @@ struct ArcDialView: View {
         .foregroundStyle(isSelected
             ? AnyShapeStyle(.tint)
             : AnyShapeStyle(.white.opacity(fade(for: distance))))
-        .rotationEffect(.radians(Double(angle)))
+        .rotationEffect(.radians(Double(angle) + markBaseRotation))
         .animation(reduceMotion ? nil : .snappy, value: isSelected)
     }
 
-    /// The fixed indicator the values sweep past — a caret pinned to centre.
+    /// The fixed indicator the values sweep past — a caret pinned outside the apex,
+    /// pointing inward at the selected mark.
     private var indicator: some View {
-        Image(systemName: "arrowtriangle.down.fill")
+        Image(systemName: axis == .horizontal ? "arrowtriangle.down.fill" : "arrowtriangle.left.fill")
             .font(.system(size: 12))
             .foregroundStyle(.tint)
             .accessibilityHidden(true)
     }
 
-    /// Softens the left and right ends of the arc so marks fade out rather than
-    /// clip at a hard edge.
+    /// Softens the ends of the arc so marks fade out rather than clip at a hard
+    /// edge, along whichever axis the dial sweeps.
     private var edgeFade: some View {
         LinearGradient(
             stops: [
@@ -145,8 +197,8 @@ struct ArcDialView: View {
                 .init(color: .black, location: 0.86),
                 .init(color: .clear, location: 1),
             ],
-            startPoint: .leading,
-            endPoint: .trailing
+            startPoint: axis == .horizontal ? .leading : .top,
+            endPoint: axis == .horizontal ? .trailing : .bottom
         )
     }
 
@@ -166,9 +218,10 @@ struct ArcDialView: View {
                     haptics.prepare()
                 }
 
-                // Dragging left advances toward higher values; one `pointsPerStop`
-                // of travel is one stop.
-                let raw = CGFloat(dragAnchorIndex) - value.translation.width / pointsPerStop
+                // Dragging back along the axis (left / up) advances toward higher
+                // values; one `pointsPerStop` of travel is one stop.
+                let travel = axis == .horizontal ? value.translation.width : value.translation.height
+                let raw = CGFloat(dragAnchorIndex) - travel / pointsPerStop
                 let clamped = min(max(raw, 0), CGFloat(labels.count - 1))
                 dragPosition = clamped
 
@@ -216,7 +269,7 @@ private extension Array {
     }
 }
 
-#Preview {
+#Preview("Horizontal") {
     struct DialPreview: View {
         @State private var index = 18 // f/8 on the aperture scale
         var body: some View {
@@ -228,6 +281,30 @@ private extension Array {
                         labels: PhotographicScale.aperture.stops.map(\.label),
                         selectedIndex: index,
                         caption: "Aperture",
+                        onSelect: { index = $0 }
+                    )
+                }
+            }
+            .tint(.yellow)
+            .preferredColorScheme(.dark)
+        }
+    }
+    return DialPreview()
+}
+
+#Preview("Vertical") {
+    struct DialPreview: View {
+        @State private var index = 18 // f/8 on the aperture scale
+        var body: some View {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                HStack {
+                    Spacer()
+                    ArcDialView(
+                        labels: PhotographicScale.aperture.stops.map(\.label),
+                        selectedIndex: index,
+                        caption: "Aperture",
+                        axis: .vertical,
                         onSelect: { index = $0 }
                     )
                 }
