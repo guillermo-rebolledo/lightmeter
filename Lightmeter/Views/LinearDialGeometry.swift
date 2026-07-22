@@ -10,17 +10,18 @@ import CoreGraphics
 /// horizontal, y when vertical) from the fixed indicator at its centre; positive
 /// offsets point toward higher-value stops (right / down).
 struct LinearDialGeometry {
-    /// Drag distance (points) along the main axis that advances the dial one stop.
-    let pointsPerStop: CGFloat
-    /// Distance (points) between adjacent ticks along the main axis.
-    let tickSpacing: CGFloat
+    /// The distance (points) along the main axis of one stop: both the drag travel
+    /// that advances the selection one stop and the gap between adjacent ticks. A
+    /// single value keeps the two in lockstep, so the ruler tracks the finger 1:1 —
+    /// the mark under your thumb stays under it as you sweep.
+    let spacing: CGFloat
 
     /// The continuous dial position for a drag that began at `anchor`, clamped to
     /// `[0, stopCount - 1]`. Dragging back along the axis (negative `travel`)
-    /// advances toward higher values, so one `pointsPerStop` of travel is one stop.
+    /// advances toward higher values, so one `spacing` of travel is one stop.
     func position(fromAnchor anchor: Int, travel: CGFloat, stopCount: Int) -> CGFloat {
         guard stopCount > 0 else { return 0 }
-        let raw = CGFloat(anchor) - travel / pointsPerStop
+        let raw = CGFloat(anchor) - travel / spacing
         return min(max(raw, 0), CGFloat(stopCount - 1))
     }
 
@@ -35,13 +36,14 @@ struct LinearDialGeometry {
     /// selected tick sits on the indicator (offset `0`) and its neighbours fan out
     /// evenly and symmetrically either side.
     func tickOffset(for index: Int, position: CGFloat) -> CGFloat {
-        (CGFloat(index) - position) * tickSpacing
+        (CGFloat(index) - position) * spacing
     }
 
     /// The window of stop indices worth drawing: `span` stops either side of the
-    /// current position, clamped to the scale's bounds. Empty for an empty scale.
+    /// current position, clamped to the scale's bounds. Empty for an empty scale or
+    /// a negative span (which has no window to draw).
     func visibleIndices(around position: CGFloat, stopCount: Int, span: Int) -> [Int] {
-        guard stopCount > 0 else { return [] }
+        guard stopCount > 0, span >= 0 else { return [] }
         let center = min(max(stop(at: position), 0), stopCount - 1)
         let lower = max(center - span, 0)
         let upper = min(center + span, stopCount - 1)

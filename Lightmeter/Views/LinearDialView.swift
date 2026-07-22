@@ -49,11 +49,11 @@ struct LinearDialView: View {
     /// which SwiftUI's edge-triggered `.sensoryFeedback` can't express.
     @State private var haptics = UISelectionFeedbackGenerator()
 
-    /// The tick-placement and drag→stop math, shared with the unit tests. Drag
-    /// distance and tick spacing are equal so the ruler tracks the finger 1:1 —
-    /// the mark under your thumb stays under it as you sweep (direct manipulation),
-    /// which a straight ruler should honour even though the old arc did not.
-    private let geometry = LinearDialGeometry(pointsPerStop: 48, tickSpacing: 48)
+    /// The tick-placement and drag→stop math, shared with the unit tests. Its
+    /// single `spacing` makes the ruler track the finger 1:1 — the mark under your
+    /// thumb stays under it as you sweep (direct manipulation), which a straight
+    /// ruler should honour even though the old arc did not.
+    private let geometry = LinearDialGeometry(spacing: 48)
     /// How many stops fan out either side of centre before they clip/fade.
     private let visibleSpan = 7
     /// Distance from the hugged edge to the centred selected label (nearest edge).

@@ -6,24 +6,36 @@ import CoreGraphics
 /// Extracted from the view so the risky geometry can be exercised in isolation,
 /// with no SwiftUI, gestures, or haptics in the way.
 struct LinearDialGeometryTests {
-    private let geometry = LinearDialGeometry(pointsPerStop: 50, tickSpacing: 40)
+    private let spacing: CGFloat = 40
+    private var geometry: LinearDialGeometry { LinearDialGeometry(spacing: spacing) }
 
     // MARK: - Drag → position
 
     @Test("One stop of drag advances the dial exactly one stop")
     func oneStopOfDragIsOneStop() {
         // Dragging back along the axis (negative travel) advances toward higher
-        // values; one `pointsPerStop` of travel is one stop.
-        let position = geometry.position(fromAnchor: 4, travel: -50, stopCount: 20)
+        // values; one `spacing` of travel is one stop.
+        let position = geometry.position(fromAnchor: 4, travel: -spacing, stopCount: 20)
         #expect(position == 5)
 
-        let back = geometry.position(fromAnchor: 4, travel: 50, stopCount: 20)
+        let back = geometry.position(fromAnchor: 4, travel: spacing, stopCount: 20)
         #expect(back == 3)
+    }
+
+    @Test("One stop of drag slides tick offsets by exactly one spacing")
+    func oneStopOfDragSlidesTicksOneSpacing() {
+        // The drag scale and the tick spacing are one value, so the ruler tracks
+        // the finger 1:1: dragging one stop moves every tick exactly one spacing.
+        let atRest = (2...8).map { geometry.tickOffset(for: $0, position: 4) }
+        let oneStopIn = geometry.position(fromAnchor: 4, travel: -spacing, stopCount: 20)
+        let dragged = (2...8).map { geometry.tickOffset(for: $0, position: oneStopIn) }
+        let shift = zip(atRest, dragged).map { $1 - $0 }
+        #expect(shift.allSatisfy { abs($0 - -spacing) < 0.0001 })
     }
 
     @Test("A fractional drag yields a fractional, continuous position")
     func fractionalDragIsContinuous() {
-        let position = geometry.position(fromAnchor: 4, travel: -25, stopCount: 20)
+        let position = geometry.position(fromAnchor: 4, travel: -spacing / 2, stopCount: 20)
         #expect(position == 4.5)
     }
 
@@ -89,5 +101,12 @@ struct LinearDialGeometryTests {
     func emptyScaleHasNoTicks() {
         #expect(geometry.visibleIndices(around: 0, stopCount: 0, span: 3).isEmpty)
         #expect(geometry.position(fromAnchor: 0, travel: -100, stopCount: 0) == 0)
+    }
+
+    @Test("A negative span yields no ticks rather than trapping")
+    func negativeSpanHasNoTicks() {
+        // A negative span would make the lower bound exceed the upper and trap the
+        // range; it must resolve to an empty window instead.
+        #expect(geometry.visibleIndices(around: 10, stopCount: 20, span: -1).isEmpty)
     }
 }
