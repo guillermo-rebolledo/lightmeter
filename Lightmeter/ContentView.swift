@@ -42,6 +42,7 @@ struct ContentView: View {
                 case .idle, .metering:
                     CameraPreviewView(
                         session: camera.session,
+                        device: camera.captureDevice,
                         spot: model.spot,
                         isSpotActive: model.pattern == .spot,
                         onPlaceSpot: { model.placeSpot(at: $0) }

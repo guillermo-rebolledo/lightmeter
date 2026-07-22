@@ -17,6 +17,14 @@ final class CameraLightSource: NSObject, LightSource {
     /// preview can bind an `AVCaptureVideoPreviewLayer` to it.
     let session = AVCaptureSession()
 
+    /// The rear wide-angle camera, resolved once so the capture input and the
+    /// preview's `RotationCoordinator` share a single device reference. `nil`
+    /// where there's no rear camera (e.g. the Simulator), which leaves the
+    /// session unconfigured and surfaces as capture being unavailable.
+    let captureDevice = AVCaptureDevice.default(
+        .builtInWideAngleCamera, for: .video, position: .back
+    )
+
     private let sessionQueue = DispatchQueue(label: "com.lightmeter.camera.session")
     private let sampleQueue = DispatchQueue(label: "com.lightmeter.camera.samples")
     private let videoOutput = AVCaptureVideoDataOutput()
@@ -126,7 +134,7 @@ final class CameraLightSource: NSObject, LightSource {
         session.sessionPreset = .high
 
         guard
-            let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+            let device = captureDevice,
             let input = try? AVCaptureDeviceInput(device: device),
             session.canAddInput(input)
         else {
