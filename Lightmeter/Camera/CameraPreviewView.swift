@@ -19,7 +19,7 @@ struct CameraPreviewView: UIViewRepresentable {
     /// orientation and the scene stays upright as the device rotates. `nil`
     /// where there's no camera (e.g. the Simulator); rotation tracking is then
     /// simply inert.
-    var device: AVCaptureDevice?
+    var captureDevice: AVCaptureDevice?
 
     /// The active spot as a normalized device point, or `nil` when none is placed
     /// — drives where the reticle is drawn.
@@ -52,7 +52,7 @@ struct CameraPreviewView: UIViewRepresentable {
         // preview angle so the live scene stays upright as the device rotates.
         // The session is already attached, so the layer's connection exists.
         context.coordinator.startTrackingRotation(
-            device: device,
+            device: captureDevice,
             previewLayer: view.videoPreviewLayer
         )
         return view
@@ -122,7 +122,12 @@ struct CameraPreviewView: UIViewRepresentable {
             guard let connection = previewLayer.connection,
                   connection.isVideoRotationAngleSupported(angle)
             else { return }
+            // Snap to the new angle: without disabling actions the preview would
+            // visibly spin through a default CALayer animation on each rotation.
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
             connection.videoRotationAngle = angle
+            CATransaction.commit()
         }
 
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
