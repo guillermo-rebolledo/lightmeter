@@ -23,7 +23,8 @@ struct LandscapeMeterLayout: View {
     let advisories: [ExposureAdvisory]
     let isTourActive: Bool
 
-    /// The leading control column's width, sized to hold the horizontal rows
+    /// The leading control column's total panel width (including its material
+    /// padding), sized within the ~240–280pt band to hold the horizontal rows
     /// comfortably without crowding the preview hero.
     private let columnWidth: CGFloat = 260
 
@@ -52,10 +53,12 @@ struct LandscapeMeterLayout: View {
             Spacer(minLength: 12)
             MeterAdvisories(advisories: advisories, isTourActive: isTourActive)
         }
-        .frame(width: columnWidth, alignment: .top)
-        .frame(maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .padding(20)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        // Constrain the whole panel (content + material padding) to the band,
+        // rather than the inner content — so the rendered card stays ~260pt.
+        .frame(width: columnWidth)
         .padding(.leading, 16)
         .padding(.vertical, 16)
     }
