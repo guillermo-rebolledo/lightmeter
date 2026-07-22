@@ -164,7 +164,10 @@ struct ContentView: View {
                 PortraitMeterLayout(
                     model: model,
                     advisories: advisories,
-                    isTourActive: tour.isPresented
+                    isTourActive: tour.isPresented,
+                    // Only drive the strip's tour override while the tour is
+                    // actually presented; otherwise the strip stays view-local.
+                    tourStep: tour.isPresented ? tour.currentStep : nil
                 )
             }
         }
