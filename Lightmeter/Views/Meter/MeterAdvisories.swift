@@ -8,7 +8,9 @@ import SwiftUI
 struct MeterAdvisories: View {
     let advisories: [ExposureAdvisory]
     let isTourActive: Bool
-    /// Portrait collapses advisories to one thin line; landscape stacks them.
+    /// Collapse the advisories to one thin line. Both orientations render the
+    /// thin line now (the shared `MeterHUDCard` passes `true`); the stacked form
+    /// is the default kept for previews and any non-card caller.
     var isCompact: Bool = false
 
     var body: some View {
