@@ -62,12 +62,16 @@ struct GlassPillBackground: ViewModifier {
     }
 }
 
-/// An exposure-triangle chip surface. iOS 26: Liquid Glass, prominently
-/// accent-tinted for the bound leg, a softer tint for the solved leg, clear for a
-/// plain set leg. Pre-26: the tint-wash / bright-fill / white-on-glass fills. The
-/// accent ring rides on top of both paths so the bound and solved rings survive.
+/// An exposure-triangle chip surface. All three chips share one identical base
+/// surface — clear Liquid Glass on iOS 26, white-on-glass on the fallback — so the
+/// row reads as a single control rather than three differently-weighted fills.
+/// State rides on top as a single consistent cue: the dial-bound leg gets an
+/// accent ring (the "selected" marker). The solved leg is distinguished by its
+/// accent value text (set in `ExposureChipsView`), not by a different fill, so the
+/// set / bound / solved hierarchy stays legible without breaking the shared look.
 struct GlassChipBackground: ViewModifier {
-    let isSolved: Bool
+    /// The chip the ruler dial is bound to — the only state that changes the
+    /// surface, via an accent selection ring.
     let isBound: Bool
 
     private var shape: RoundedRectangle {
@@ -77,35 +81,16 @@ struct GlassChipBackground: ViewModifier {
     func body(content: Content) -> some View {
         surface(content)
             .overlay(
-                shape.strokeBorder(.tint.opacity(strokeOpacity), lineWidth: isBound ? 1.5 : 1)
+                shape.strokeBorder(.tint.opacity(isBound ? 0.9 : 0), lineWidth: 1.5)
             )
     }
 
     @ViewBuilder private func surface(_ content: Content) -> some View {
         if #available(iOS 26, *) {
-            content.glassEffect(glass, in: shape)
+            content.glassEffect(.regular, in: shape)
         } else {
-            content.background(fillStyle, in: shape)
+            content.background(.white.opacity(0.08), in: shape)
         }
-    }
-
-    @available(iOS 26, *)
-    private var glass: Glass {
-        if isBound { return .regular.tint(glassAccent) }
-        if isSolved { return .regular.tint(glassAccent.opacity(0.5)) }
-        return .regular
-    }
-
-    private var fillStyle: AnyShapeStyle {
-        if isSolved { return AnyShapeStyle(.tint.opacity(0.16)) }
-        if isBound { return AnyShapeStyle(.tint.opacity(0.22)) }
-        return AnyShapeStyle(.white.opacity(0.08))
-    }
-
-    private var strokeOpacity: Double {
-        if isBound { return 0.9 }
-        if isSolved { return 0.55 }
-        return 0
     }
 }
 

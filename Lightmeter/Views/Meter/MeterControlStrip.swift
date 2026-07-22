@@ -103,11 +103,19 @@ struct MeterControlStrip: View {
         return Button {
             toggle(section)
         } label: {
-            Image(systemName: systemImage)
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(isOpen ? AnyShapeStyle(.tint) : AnyShapeStyle(.white))
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .modifier(GlassPillBackground(isActive: isOpen))
+            // Glyph + current value fills the pill deliberately, so each button
+            // carries its state at a glance instead of floating a lone icon in a
+            // wide, empty capsule.
+            HStack(spacing: 6) {
+                Image(systemName: systemImage)
+                Text(value)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(isOpen ? AnyShapeStyle(.tint) : AnyShapeStyle(.white))
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .modifier(GlassPillBackground(isActive: isOpen))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)

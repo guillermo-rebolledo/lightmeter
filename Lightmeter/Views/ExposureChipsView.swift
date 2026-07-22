@@ -98,7 +98,7 @@ private struct ValueChip: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 11)
         .padding(.horizontal, 8)
-        .modifier(GlassChipBackground(isSolved: isSolved, isBound: isBound))
+        .modifier(GlassChipBackground(isBound: isBound))
     }
 
     // The solved leg is accent-tinted throughout; the set legs read as plain
