@@ -17,15 +17,19 @@ final class CameraLightSource: NSObject, LightSource {
     /// preview can bind an `AVCaptureVideoPreviewLayer` to it.
     let session = AVCaptureSession()
 
+    /// The rear wide-angle camera, resolved once so the capture input and the
+    /// preview's `RotationCoordinator` share a single device reference. `nil`
+    /// where there's no rear camera (e.g. the Simulator), which leaves the
+    /// session unconfigured and surfaces as capture being unavailable.
+    let captureDevice = AVCaptureDevice.default(
+        .builtInWideAngleCamera, for: .video, position: .back
+    )
+
     private let sessionQueue = DispatchQueue(label: "com.lightmeter.camera.session")
     private let sampleQueue = DispatchQueue(label: "com.lightmeter.camera.samples")
     private let videoOutput = AVCaptureVideoDataOutput()
     private var sampler: ReadingSampler?
     private var isConfigured = false
-
-    /// The capture device once configured, retained so the AE region of interest
-    /// can be re-aimed for spot metering. Touched only on `sessionQueue`.
-    private var device: AVCaptureDevice?
 
     /// The exposure point of interest to keep the device aimed at — center for
     /// whole-frame average, or the placed spot. Touched only on `sessionQueue`.
@@ -106,10 +110,10 @@ final class CameraLightSource: NSObject, LightSource {
     // MARK: - Configuration
 
     /// Aims the device's continuous auto-exposure at `exposurePoint`. Runs on
-    /// `sessionQueue`; a no-op until the device is configured or if the device
-    /// doesn't support a settable point of interest.
+    /// `sessionQueue`; a no-op if there's no camera or the device doesn't support
+    /// a settable point of interest. Always called after `configureIfNeeded()`.
     private func applyExposurePoint() {
-        guard let device, device.isExposurePointOfInterestSupported else { return }
+        guard let device = captureDevice, device.isExposurePointOfInterestSupported else { return }
         guard (try? device.lockForConfiguration()) != nil else { return }
         device.exposurePointOfInterest = exposurePoint
         if device.isExposureModeSupported(.continuousAutoExposure) {
@@ -126,14 +130,13 @@ final class CameraLightSource: NSObject, LightSource {
         session.sessionPreset = .high
 
         guard
-            let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+            let device = captureDevice,
             let input = try? AVCaptureDeviceInput(device: device),
             session.canAddInput(input)
         else {
             return
         }
         session.addInput(input)
-        self.device = device
 
         // Continuous auto-exposure so the streamed metadata tracks the live scene.
         if (try? device.lockForConfiguration()) != nil {

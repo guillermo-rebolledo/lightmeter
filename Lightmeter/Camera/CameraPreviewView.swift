@@ -14,6 +14,13 @@ import AVFoundation
 struct CameraPreviewView: UIViewRepresentable {
     let session: AVCaptureSession
 
+    /// The capture device feeding the session, used to build a
+    /// `RotationCoordinator` so the preview connection tracks interface
+    /// orientation and the scene stays upright as the device rotates. `nil`
+    /// where there's no camera (e.g. the Simulator); rotation tracking is then
+    /// simply inert.
+    var captureDevice: AVCaptureDevice?
+
     /// The active spot as a normalized device point, or `nil` when none is placed
     /// — drives where the reticle is drawn.
     var spot: CGPoint?
@@ -40,6 +47,14 @@ struct CameraPreviewView: UIViewRepresentable {
             action: #selector(Coordinator.handleTap(_:))
         )
         view.addGestureRecognizer(tap)
+
+        // Drive the preview connection's rotation from the device's horizon-level
+        // preview angle so the live scene stays upright as the device rotates.
+        // The session is already attached, so the layer's connection exists.
+        context.coordinator.startTrackingRotation(
+            device: captureDevice,
+            previewView: view
+        )
         return view
     }
 
@@ -59,9 +74,65 @@ struct CameraPreviewView: UIViewRepresentable {
         /// metering-pattern toggle is the only control that changes the mode.
         var isSpotActive: Bool
 
+        /// Tracks the device's physical orientation and publishes the rotation
+        /// angle that keeps the preview horizon-level. Retained for the lifetime
+        /// of the preview so its KVO keeps firing.
+        private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
+        private var rotationObservation: NSKeyValueObservation?
+
         init(onPlaceSpot: @escaping (CGPoint) -> Void, isSpotActive: Bool) {
             self.onPlaceSpot = onPlaceSpot
             self.isSpotActive = isSpotActive
+        }
+
+        /// Begins driving the preview connection's rotation from the device's
+        /// horizon-level preview angle. `.initial` applies the current angle up
+        /// front, then each subsequent orientation change flows through KVO. The
+        /// AVFoundation-managed rotation is what keeps `captureDevicePointConverted`
+        /// mapping taps correctly after a rotation, so spot metering stays aligned.
+        func startTrackingRotation(
+            device: AVCaptureDevice?,
+            previewView: PreviewView
+        ) {
+            // No device (e.g. the Simulator) means no preview to keep upright.
+            guard let device else { return }
+            let coordinator = AVCaptureDevice.RotationCoordinator(
+                device: device, previewLayer: previewView.videoPreviewLayer
+            )
+            rotationCoordinator = coordinator
+            rotationObservation = coordinator.observe(
+                \.videoRotationAngleForHorizonLevelPreview,
+                options: [.initial, .new]
+            ) { [weak previewView] observed, _ in
+                guard let previewView else { return }
+                Self.applyRotation(
+                    observed.videoRotationAngleForHorizonLevelPreview,
+                    to: previewView.videoPreviewLayer
+                )
+                // The new connection angle remaps device points to layer points,
+                // so re-pin the reticle now rather than waiting for the next
+                // layout pass — the view's bounds don't change on rotation while
+                // the app is orientation-locked, so no layout pass is guaranteed.
+                previewView.refreshReticle()
+            }
+        }
+
+        /// Applies `angle` to the preview connection when supported. The preview
+        /// layer's own connection is the only one touched here — capture-output
+        /// rotation is a separate concern owned elsewhere.
+        private static func applyRotation(
+            _ angle: CGFloat,
+            to previewLayer: AVCaptureVideoPreviewLayer
+        ) {
+            guard let connection = previewLayer.connection,
+                  connection.isVideoRotationAngleSupported(angle)
+            else { return }
+            // Snap to the new angle: without disabling actions the preview would
+            // visibly spin through a default CALayer animation on each rotation.
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            connection.videoRotationAngle = angle
+            CATransaction.commit()
         }
 
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
@@ -112,6 +183,13 @@ struct CameraPreviewView: UIViewRepresentable {
 
         override func layoutSubviews() {
             super.layoutSubviews()
+            positionReticle()
+        }
+
+        /// Re-pins the reticle to its device point after the preview connection's
+        /// rotation changes — that remaps device points to layer points without
+        /// necessarily triggering a layout pass.
+        func refreshReticle() {
             positionReticle()
         }
 
