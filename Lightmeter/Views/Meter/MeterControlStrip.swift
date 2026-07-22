@@ -107,14 +107,7 @@ struct MeterControlStrip: View {
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(isOpen ? AnyShapeStyle(.tint) : AnyShapeStyle(.white))
                 .frame(maxWidth: .infinity, minHeight: 44)
-                .background(
-                    isOpen ? AnyShapeStyle(.tint.opacity(0.22)) : AnyShapeStyle(.white.opacity(0.08)),
-                    in: Capsule()
-                )
-                .overlay(
-                    Capsule()
-                        .strokeBorder(.tint.opacity(isOpen ? 0.8 : 0), lineWidth: 1)
-                )
+                .modifier(GlassPillBackground(isActive: isOpen))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
