@@ -4,24 +4,24 @@ import SwiftUI
 struct FreezeButton: View {
     let isFrozen: Bool
     let canFreeze: Bool
+    /// Portrait's decluttered card demotes freeze to a small icon-only button;
+    /// landscape keeps the full labeled pill that fills the row.
+    var isCompact: Bool = false
     let onToggle: () -> Void
+
+    private var systemImage: String { isFrozen ? "play.fill" : "pause.fill" }
 
     var body: some View {
         Button(action: onToggle) {
-            Label(
-                isFrozen ? "Resume" : "Hold",
-                systemImage: isFrozen ? "play.fill" : "pause.fill"
-            )
-            .font(.footnote.bold())
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .background(
-                isFrozen ? AnyShapeStyle(.tint.opacity(0.22)) : AnyShapeStyle(.white.opacity(0.08)),
-                in: Capsule()
-            )
-            .overlay(
-                Capsule()
-                    .strokeBorder(.tint.opacity(isFrozen ? 0.8 : 0), lineWidth: 1)
-            )
+            label
+                .background(
+                    isFrozen ? AnyShapeStyle(.tint.opacity(0.22)) : AnyShapeStyle(.white.opacity(0.08)),
+                    in: Capsule()
+                )
+                .overlay(
+                    Capsule()
+                        .strokeBorder(.tint.opacity(isFrozen ? 0.8 : 0), lineWidth: 1)
+                )
         }
         .buttonStyle(.plain)
         .disabled(canFreeze == false)
@@ -31,6 +31,18 @@ struct FreezeButton: View {
                 ? "Accepts new light readings"
                 : "Keeps the current exposure values steady"
         )
+    }
+
+    @ViewBuilder private var label: some View {
+        if isCompact {
+            Image(systemName: systemImage)
+                .font(.footnote.bold())
+                .frame(width: 44, height: 44)
+        } else {
+            Label(isFrozen ? "Resume" : "Hold", systemImage: systemImage)
+                .font(.footnote.bold())
+                .frame(maxWidth: .infinity, minHeight: 44)
+        }
     }
 }
 

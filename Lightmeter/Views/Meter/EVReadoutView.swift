@@ -7,6 +7,9 @@ import SwiftUI
 /// changes without the layout re-declaring the anchor.
 struct EVReadoutView: View {
     let ev: Double?
+    /// Portrait's decluttered card renders the readout moderately smaller while
+    /// keeping it permanently visible; landscape keeps the full hero size.
+    var isCompact: Bool = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -19,7 +22,7 @@ struct EVReadoutView: View {
                 .tracking(1.5)
 
             Text(ev.map { String(format: "%.1f", $0) } ?? "—")
-                .font(.system(size: 46, weight: .semibold, design: .rounded))
+                .font(.system(size: isCompact ? 34 : 46, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(.white)
                 .contentTransition(.numericText())

@@ -8,9 +8,11 @@ import SwiftUI
 struct MeterAdvisories: View {
     let advisories: [ExposureAdvisory]
     let isTourActive: Bool
+    /// Portrait collapses advisories to one thin line; landscape stacks them.
+    var isCompact: Bool = false
 
     var body: some View {
-        AdvisoriesView(advisories: advisories)
+        AdvisoriesView(advisories: advisories, isCompact: isCompact)
             .opacity(isTourActive ? 0 : 1)
             .allowsHitTesting(isTourActive == false)
             .accessibilityHidden(isTourActive)
