@@ -23,29 +23,23 @@ struct CameraStatusView: View {
     }
 
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "video.slash")
-                .font(.system(size: 52, weight: .thin))
-                .foregroundStyle(.white)
-                .accessibilityHidden(true)
-
-            Text(title)
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(.white)
-
+        // ContentUnavailableView handles centering, width, and size-class
+        // adaptation, and exposes the label + description to VoiceOver while
+        // keeping the icon decorative.
+        ContentUnavailableView {
+            Label(title, systemImage: "video.slash")
+        } description: {
             Text(message)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-
+        } actions: {
             if showsSettingsLink,
                let settingsURL = URL(string: UIApplication.openSettingsURLString) {
                 Link("Open Settings", destination: settingsURL)
                     .font(.body.weight(.semibold))
-                    .padding(.top, 4)
             }
         }
-        .padding()
+        // The status screen always sits on the black camera surface, so pin the
+        // system colors to dark to keep the label + description legible even
+        // when the device is in light mode.
+        .environment(\.colorScheme, .dark)
     }
 }
