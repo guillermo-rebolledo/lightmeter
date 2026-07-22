@@ -2,28 +2,52 @@ import SwiftUI
 
 /// The portrait arrangement of the metering HUD: a single, light material card
 /// hugging the bottom edge. The scene EV@ISO100 reference, the exposure-triangle
-/// controls, and the ruler dial all fold into the *same* compact card, so the
-/// whole HUD reads as one small unit rather than several stacked bands.
+/// chips, and the ruler dial all fold into the *same* compact card, so the whole
+/// HUD reads as one small unit rather than several stacked bands.
 ///
-/// Composes the shared meter controls into the portrait layout. Each control is
-/// a standalone view carrying its own tour anchor, so the landscape layout can
-/// reuse the same instances without duplicating the view tree or re-wiring the
-/// guided tour.
+/// The persistent set is exactly: the EV readout, the three chips, the folded-in
+/// dial, a small freeze icon, and a thin advisory line. The occasional
+/// controls — compensation, metering pattern, and priority mode — live in the
+/// inline expanding `PortraitControlStrip` above the chips, revealed on demand
+/// rather than always shown. (Landscape keeps them always-visible via its own
+/// shared composite rows.)
 struct PortraitMeterLayout: View {
     let model: MeterViewModel
     /// The advisories snapshot to display — frozen while the tour runs.
     let advisories: [ExposureAdvisory]
     let isTourActive: Bool
+    /// The guided tour's current step, forwarded to the control strip so it can
+    /// force-open the section the active step targets (and its anchor resolves).
+    var tourStep: GuidedTourStep?
 
     var body: some View {
         VStack(spacing: 0) {
             Spacer()
             VStack(spacing: 12) {
-                EVReadoutView(ev: model.ev, isCompact: true)
-                FreezeCompensationRow(model: model, isCompact: true)
+                // Freeze is demoted to a small icon at the trailing edge; a
+                // matching empty slot on the leading edge keeps the readout
+                // centered without the icon ever overlapping it.
+                HStack(spacing: 0) {
+                    Color.clear.frame(width: 44, height: 44)
+                    EVReadoutView(ev: model.ev, isCompact: true)
+                        .frame(maxWidth: .infinity)
+                    FreezeButton(
+                        isFrozen: model.isFrozen,
+                        // Mirror `toggleFreeze`'s own guard so the button stays
+                        // enabled in every state the toggle accepts.
+                        canFreeze: model.latestReading != nil || model.isFrozen,
+                        isCompact: true,
+                        onToggle: model.toggleFreeze
+                    )
+                }
                 MeterAdvisories(advisories: advisories, isTourActive: isTourActive, isCompact: true)
-                MeteringPatternRow(model: model)
-                PriorityAndChipsGroup(model: model)
+                PortraitControlStrip(model: model, tourStep: tourStep)
+                ExposureChipsView(
+                    triangle: model.triangle,
+                    boundComponent: model.boundComponent,
+                    onSelect: { model.bindDial(to: $0) }
+                )
+                .guidedTourAnchor(.priorityAndChips)
                 MeterDialHost(model: model)
             }
             .padding(14)
