@@ -27,7 +27,7 @@ struct MeterHUDCard: View {
     var tourStep: GuidedTourStep?
     /// Whether the ruler dial folds into the card below the chips (portrait) or
     /// is mounted separately on the trailing edge (landscape).
-    var foldsInDial: Bool
+    let foldsInDial: Bool
 
     var body: some View {
         VStack(spacing: 12) {

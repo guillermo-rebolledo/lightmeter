@@ -33,20 +33,28 @@ struct LandscapeMeterLayout: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            MeterHUDCard(
-                model: model,
-                advisories: advisories,
-                isTourActive: isTourActive,
-                tourStep: tourStep,
-                foldsInDial: false
-            )
-            .frame(width: columnWidth)
-            .padding(.leading, 16)
-            .padding(.vertical, 16)
-            // Pin the compact card to the top-leading corner rather than
-            // stretching it — it keeps its natural height, mirroring how
-            // portrait hugs the bottom edge.
-            .frame(maxHeight: .infinity, alignment: .top)
+            // Scroll only when the card can't fit: `.basedOnSize` keeps it
+            // pinned to the top at its natural height (mirroring how portrait
+            // hugs the bottom edge) and starts scrolling only when a short
+            // landscape height or large Dynamic Type sizes would otherwise clip
+            // the chips — and with them the `.priorityAndChips` tour anchor.
+            ScrollView(.vertical) {
+                MeterHUDCard(
+                    model: model,
+                    advisories: advisories,
+                    isTourActive: isTourActive,
+                    tourStep: tourStep,
+                    foldsInDial: false
+                )
+                .frame(width: columnWidth)
+                .padding(.leading, 16)
+                .padding(.vertical, 16)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollIndicators(.hidden)
+            // Constrain the scroll region to the card's footprint so the middle
+            // stays clear preview; the width folds in the leading inset.
+            .frame(width: columnWidth + 16)
 
             // The preview hero shows through this middle region.
             Spacer(minLength: 0)
