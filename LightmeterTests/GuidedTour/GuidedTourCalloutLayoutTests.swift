@@ -64,7 +64,7 @@ struct GuidedTourCalloutLayoutTests {
     @Test("Landscape trailing dial places the callout to its leading side")
     func landscapeTrailingDialPlacesLeading() {
         let bounds = CGRect(x: 0, y: 0, width: 844, height: 390)
-        // The vertical arc dial: tall and hugging the right edge.
+        // The vertical ruler dial: tall and hugging the right edge.
         let target = CGRect(x: 784, y: 16, width: 60, height: 358)
 
         let frame = GuidedTourCalloutLayout.calloutFrame(

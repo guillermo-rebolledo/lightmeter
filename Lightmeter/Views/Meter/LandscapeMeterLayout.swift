@@ -9,7 +9,7 @@ import SwiftUI
 ///   advisories anchored at the column's bottom.
 /// - **Middle:** the preview shows through; the EV@ISO100 readout floats at its
 ///   top-leading corner as the hero reference.
-/// - **Trailing edge:** the vertical arc dial, hugging the trailing side.
+/// - **Trailing edge:** the vertical ruler dial, hugging the trailing side.
 ///
 /// Composes the *same* shared control views as `PortraitMeterLayout` — each
 /// carries its own tour anchor — so rotating between layouts never tears down

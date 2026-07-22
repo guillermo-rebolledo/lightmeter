@@ -3,7 +3,7 @@ import SwiftUI
 /// The priority-mode control: a two-segment glass pill that switches which leg
 /// the photographer locks and which the engine solves. The selected segment
 /// carries an accent-tinted highlight that slides between the two, echoing the
-/// arc dial's mechanical feel. Selecting the already-active segment is a no-op.
+/// ruler dial's mechanical feel. Selecting the already-active segment is a no-op.
 struct PriorityModeToggle: View {
     /// The active priority mode — the segment shown as selected.
     let mode: PriorityMode

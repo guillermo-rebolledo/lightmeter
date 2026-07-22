@@ -68,7 +68,7 @@ struct GuidedTourControllerTests {
 
         controller.advance()
         controller.advance()
-        #expect(controller.currentStep == .arcDial)
+        #expect(controller.currentStep == .dial)
         #expect(model.boundComponent == .iso)
         #expect(model.dialLabels.isEmpty == false)
     }

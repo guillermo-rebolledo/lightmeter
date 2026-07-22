@@ -4,7 +4,7 @@ enum GuidedTourStep: Hashable, CaseIterable {
     case evReadout
     case meteringPattern
     case priorityAndChips
-    case arcDial
+    case dial
     case compensation
     case settings
 
@@ -16,7 +16,7 @@ enum GuidedTourStep: Hashable, CaseIterable {
             "Metering pattern"
         case .priorityAndChips:
             "Priority and exposure"
-        case .arcDial:
+        case .dial:
             "Set the value"
         case .compensation:
             "Exposure compensation"
@@ -33,8 +33,8 @@ enum GuidedTourStep: Hashable, CaseIterable {
             "Use Average for the frame or Spot, then tap the preview to place the reading."
         case .priorityAndChips:
             "Fix ISO and aperture or shutter; the solved chip follows the light, with advisories when the result needs support."
-        case .arcDial:
-            "Tap an editable chip, then sweep the arc dial through real exposure stops."
+        case .dial:
+            "Tap an editable chip, then sweep the ruler dial through real exposure stops."
         case .compensation:
             "Bias the solved exposure up or down without changing your fixed settings."
         case .settings:

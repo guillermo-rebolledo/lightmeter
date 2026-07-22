@@ -103,7 +103,7 @@ final class MeterViewModel {
         )
     }
 
-    /// The current owner of the single arc dial. Binding any other control
+    /// The current owner of the single ruler dial. Binding any other control
     /// replaces it, so exposure chips and compensation can never both be active.
     private var dialTarget: DialTarget?
 
@@ -114,7 +114,7 @@ final class MeterViewModel {
         return component
     }
 
-    /// Whether the main compensation control currently owns the arc dial.
+    /// Whether the main compensation control currently owns the ruler dial.
     var isCompensationDialBound: Bool {
         dialTarget == .compensation
     }
@@ -236,7 +236,7 @@ final class MeterViewModel {
 
     // MARK: - Priority mode
 
-    /// Switches the active priority mode. If the arc dial was bound to the leg
+    /// Switches the active priority mode. If the ruler dial was bound to the leg
     /// that becomes solved (and so non-editable) under the new mode, it unbinds
     /// so the dial never drives a computed leg.
     func setMode(_ newMode: PriorityMode) {
@@ -307,13 +307,13 @@ final class MeterViewModel {
 
     // MARK: - Dial binding
 
-    /// Whether `component` is an editable (set, not solved) leg the arc dial can
+    /// Whether `component` is an editable (set, not solved) leg the ruler dial can
     /// drive. The solved leg is computed and non-editable, so it can't be bound.
     func isEditable(_ component: ExposureComponent) -> Bool {
         component != triangle.solved
     }
 
-    /// Binds the arc dial to `component`'s chip, or unbinds if it is already the
+    /// Binds the ruler dial to `component`'s chip, or unbinds if it is already the
     /// bound leg (tap to toggle). Non-editable (solved) legs are ignored. Only
     /// one leg is ever bound — binding a new one replaces the old.
     func bindDial(to component: ExposureComponent) {
@@ -322,14 +322,14 @@ final class MeterViewModel {
         dialTarget = (dialTarget == target) ? nil : target
     }
 
-    /// Binds the shared arc dial to EV compensation, or unbinds it when already
+    /// Binds the shared ruler dial to EV compensation, or unbinds it when already
     /// active. This replaces any exposure-chip binding.
     func bindCompensationDial() {
         dialTarget = isCompensationDialBound ? nil : .compensation
     }
 
     /// The dial-able stops of the bound leg's scale, or empty when nothing is
-    /// bound — what the arc dial lays out as its detents.
+    /// bound — what the ruler dial lays out as its detents.
     var boundStops: [PhotographicScale.Stop] {
         boundComponent?.scale(for: preferences.increment).stops ?? []
     }

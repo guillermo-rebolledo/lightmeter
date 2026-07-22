@@ -1,27 +1,28 @@
 import SwiftUI
 import UIKit
 
-/// A Halide-style curved dial: the scale's stops fan along an arc and sweep past
-/// a fixed indicator as you drag. Each stop that crosses the indicator fires a
-/// selection haptic — the detent tick that makes the dial feel mechanical.
-/// Snapping is stop-to-stop; the arc always settles on a real, dial-able mark.
+/// A compact linear ruler dial: the scale's stops lie along a straight ruler and
+/// sweep past a fixed indicator as you drag. Each stop that crosses the indicator
+/// fires a selection haptic — the detent tick that makes the dial feel mechanical.
+/// Snapping is stop-to-stop; the ruler always settles on a real, dial-able mark.
 ///
 /// The dial works along either `axis`. Horizontally it hugs the bottom edge and
 /// sweeps left/right (portrait); vertically it hugs the trailing edge and sweeps
-/// up/down (landscape). The vertical layout is a mirror of the horizontal one —
-/// the arc's centre moves to the side of the apex, marks fan along the edge, and
-/// the drag reads the matching translation axis.
+/// up/down (landscape). The view is axis-generic — the vertical layout is the
+/// horizontal one turned a quarter-turn, reading the matching translation axis.
 ///
 /// The dial is a pure controller: `selectedIndex` and `labels` are the source of
 /// truth (owned by `MeterViewModel`), and `onSelect` reports each new detent up.
 /// A drag is expressed in continuous stop-units and rounded to the nearest stop,
-/// so the same gesture drives both the visual sweep and the reported value.
-struct ArcDialView: View {
-    /// The thickness the dial requires across its short axis, including marks and
-    /// gesture area — a height when horizontal, a width when vertical.
-    static let layoutThickness: CGFloat = 150
+/// so the same gesture drives both the visual sweep and the reported value. All
+/// tick-placement and drag→stop math lives in `LinearDialGeometry`.
+struct LinearDialView: View {
+    /// The thickness the dial requires across its short axis, including ticks, the
+    /// centred label, and gesture area — a height when horizontal, a width when
+    /// vertical. Far slimmer than the old arc, reclaiming frame for the preview.
+    static let layoutThickness: CGFloat = 64
 
-    /// The detent labels laid out along the arc.
+    /// The detent labels laid out along the ruler.
     let labels: [String]
     /// The stop the fixed indicator currently points at, or `nil` while unbound.
     let selectedIndex: Int?
@@ -48,18 +49,19 @@ struct ArcDialView: View {
     /// which SwiftUI's edge-triggered `.sensoryFeedback` can't express.
     @State private var haptics = UISelectionFeedbackGenerator()
 
-    // Arc geometry. A large radius keeps the arc gently curved rather than a
-    // tight bowl; `anglePerStop` sets how far apart the marks fan.
-    private let radius: CGFloat = 900
-    private let anglePerStop = 3.4 * .pi / 180
-    /// Distance from the hugged edge to the arc's apex (the centred, selected mark).
-    private let apexInset: CGFloat = 34
-    /// Distance from the hugged edge to the fixed indicator, just outside the apex.
-    private let indicatorInset: CGFloat = 8
+    /// The tick-placement and drag→stop math, shared with the unit tests. Its
+    /// single `spacing` makes the ruler track the finger 1:1 — the mark under your
+    /// thumb stays under it as you sweep (direct manipulation), which a straight
+    /// ruler should honour even though the old arc did not.
+    private let geometry = LinearDialGeometry(spacing: 48)
     /// How many stops fan out either side of centre before they clip/fade.
     private let visibleSpan = 7
-    /// Drag distance (points) that advances the dial one stop.
-    private let pointsPerStop: CGFloat = 50
+    /// Distance from the hugged edge to the centred selected label (nearest edge).
+    private let labelInset: CGFloat = 14
+    /// Distance from the hugged edge to the fixed indicator caret.
+    private let indicatorInset: CGFloat = 34
+    /// Distance from the hugged edge to the row of ticks (furthest in).
+    private let tickInset: CGFloat = 50
 
     /// The effective dial position: the live drag while dragging, else the
     /// committed selection.
@@ -72,13 +74,11 @@ struct ArcDialView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let center = arcCenter(in: geo.size)
-
             ZStack {
                 ForEach(visibleIndices, id: \.self) { index in
-                    let angle = (CGFloat(index) - position) * CGFloat(anglePerStop)
-                    stopMark(index, angle: angle)
-                        .position(markPosition(angle: angle, around: center))
+                    let offset = geometry.tickOffset(for: index, position: position)
+                    tickMark(index)
+                        .position(tickPosition(offset: offset, in: geo.size))
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
@@ -86,6 +86,10 @@ struct ArcDialView: View {
             .transaction { $0.animation = nil }
             .opacity(isBound ? 1 : 0)
             .animation(.easeOut(duration: 0.15), value: isBound)
+
+            selectedLabel
+                .opacity(isBound ? 1 : 0)
+                .position(labelPosition(in: geo.size))
 
             indicator
                 .opacity(isBound ? 1 : 0)
@@ -113,81 +117,80 @@ struct ArcDialView: View {
 
     // MARK: - Geometry
 
-    /// The centre of the arc's circle. It sits deep beyond the hugged edge so the
-    /// apex bulges toward the edge: below the view when horizontal, past the
-    /// trailing edge when vertical.
-    private func arcCenter(in size: CGSize) -> CGPoint {
+    /// The centre of the ruler along its main axis: the width's midpoint when
+    /// horizontal, the height's when vertical. Ticks are placed relative to it.
+    private func mainAxisCenter(in size: CGSize) -> CGFloat {
+        axis == .horizontal ? size.width / 2 : size.height / 2
+    }
+
+    /// Where a tick sits, given its signed `offset` from the fixed indicator along
+    /// the main axis. The cross-axis position is fixed at `tickInset` from the edge.
+    private func tickPosition(offset: CGFloat, in size: CGSize) -> CGPoint {
         switch axis {
-        case .horizontal: CGPoint(x: size.width / 2, y: apexInset + radius)
-        case .vertical: CGPoint(x: size.width - apexInset - radius, y: size.height / 2)
+        case .horizontal: CGPoint(x: mainAxisCenter(in: size) + offset, y: tickInset)
+        case .vertical: CGPoint(x: size.width - tickInset, y: mainAxisCenter(in: size) + offset)
         }
     }
 
-    /// Where a mark at `angle` off centre sits on the arc. At `angle == 0` this is
-    /// the apex; positive angles fan toward higher values (right / down).
-    private func markPosition(angle: CGFloat, around center: CGPoint) -> CGPoint {
+    /// The centred selected value's anchor, near the hugged edge and lined up with
+    /// the fixed indicator along the main axis.
+    private func labelPosition(in size: CGSize) -> CGPoint {
         switch axis {
-        case .horizontal:
-            CGPoint(x: center.x + radius * sin(angle), y: center.y - radius * cos(angle))
-        case .vertical:
-            CGPoint(x: center.x + radius * cos(angle), y: center.y + radius * sin(angle))
+        case .horizontal: CGPoint(x: mainAxisCenter(in: size), y: labelInset)
+        case .vertical: CGPoint(x: size.width - labelInset, y: mainAxisCenter(in: size))
         }
     }
 
-    /// The fixed indicator's anchor: just outside the apex, on the hugged edge.
+    /// The fixed indicator's anchor: between the label and the tick row, at the
+    /// ruler's centre, so its caret points inward at the selected tick.
     private func indicatorPosition(in size: CGSize) -> CGPoint {
         switch axis {
-        case .horizontal: CGPoint(x: size.width / 2, y: indicatorInset)
-        case .vertical: CGPoint(x: size.width - indicatorInset, y: size.height / 2)
+        case .horizontal: CGPoint(x: mainAxisCenter(in: size), y: indicatorInset)
+        case .vertical: CGPoint(x: size.width - indicatorInset, y: mainAxisCenter(in: size))
         }
-    }
-
-    /// Extra rotation so a mark's upright layout sits radially: none when the arc
-    /// centre is below (horizontal), a quarter turn when it's to the side.
-    private var markBaseRotation: Double {
-        axis == .horizontal ? 0 : .pi / 2
     }
 
     // MARK: - Marks
 
-    /// A single stop on the arc: its label above a tick, rotated to sit radially
-    /// and faded by its distance from the indicator. The centred stop is accented.
-    private func stopMark(_ index: Int, angle: CGFloat) -> some View {
-        let isSelected = Int(position.rounded()) == index
+    /// A single tick on the ruler — a short capsule, accented when selected and
+    /// faded by its distance from the indicator. Only ticks are drawn here; the
+    /// selected value is labelled once, separately, over the indicator.
+    private func tickMark(_ index: Int) -> some View {
+        let isSelected = geometry.stop(at: position) == index
         let distance = abs(CGFloat(index) - position)
 
-        return VStack(spacing: 6) {
-            Text(labels[index])
-                .font(.system(size: isSelected ? 19 : 15,
-                              weight: isSelected ? .semibold : .regular,
-                              design: .rounded))
-                .monospacedDigit()
-                .fixedSize()
-                // Undo the base rotation on the label alone so numbers stay
-                // upright and readable; only the small per-stop `angle` tilt
-                // (shared with the tick) remains.
-                .rotationEffect(.radians(-markBaseRotation))
-
-            Capsule()
-                .frame(width: isSelected ? 2 : 1, height: isSelected ? 14 : 9)
-        }
-        .foregroundStyle(isSelected
-            ? AnyShapeStyle(.tint)
-            : AnyShapeStyle(.white.opacity(fade(for: distance))))
-        .rotationEffect(.radians(Double(angle) + markBaseRotation))
-        .animation(reduceMotion ? nil : .snappy, value: isSelected)
+        return Capsule()
+            .frame(
+                width: axis == .horizontal ? (isSelected ? 2 : 1) : (isSelected ? 16 : 10),
+                height: axis == .horizontal ? (isSelected ? 16 : 10) : (isSelected ? 2 : 1)
+            )
+            .foregroundStyle(isSelected
+                ? AnyShapeStyle(.tint)
+                : AnyShapeStyle(.white.opacity(fade(for: distance))))
+            .animation(reduceMotion ? nil : .snappy, value: isSelected)
     }
 
-    /// The fixed indicator the values sweep past — a caret pinned outside the apex,
-    /// pointing inward at the selected mark.
+    /// The single labelled value: the selected stop, shown once over the indicator
+    /// so the ruler reads as ticks with one number rather than a wall of digits.
+    private var selectedLabel: some View {
+        Text(labels[safe: geometry.stop(at: position)] ?? "")
+            .font(.system(size: 19, weight: .semibold, design: .rounded))
+            .monospacedDigit()
+            .fixedSize()
+            .foregroundStyle(.tint)
+            .animation(nil, value: position)
+    }
+
+    /// The fixed indicator the values sweep past — a caret pinned over the tick row,
+    /// pointing at the selected mark.
     private var indicator: some View {
         Image(systemName: axis == .horizontal ? "arrowtriangle.down.fill" : "arrowtriangle.left.fill")
-            .font(.system(size: 12))
+            .font(.system(size: 11))
             .foregroundStyle(.tint)
             .accessibilityHidden(true)
     }
 
-    /// Softens the ends of the arc so marks fade out rather than clip at a hard
+    /// Softens the ends of the ruler so ticks fade out rather than clip at a hard
     /// edge, along whichever axis the dial sweeps.
     private var edgeFade: some View {
         LinearGradient(
@@ -221,11 +224,10 @@ struct ArcDialView: View {
                 // Dragging back along the axis (left / up) advances toward higher
                 // values; one `pointsPerStop` of travel is one stop.
                 let travel = axis == .horizontal ? value.translation.width : value.translation.height
-                let raw = CGFloat(dragAnchorIndex) - travel / pointsPerStop
-                let clamped = min(max(raw, 0), CGFloat(labels.count - 1))
+                let clamped = geometry.position(fromAnchor: dragAnchorIndex, travel: travel, stopCount: labels.count)
                 dragPosition = clamped
 
-                let rounded = Int(clamped.rounded())
+                let rounded = geometry.stop(at: clamped)
                 guard rounded != committedIndex else { return }
 
                 // A tick per stop actually crossed, so a fast flick over several
@@ -248,14 +250,10 @@ struct ArcDialView: View {
 
     /// The window of stop indices worth drawing around the current position.
     private var visibleIndices: [Int] {
-        guard labels.isEmpty == false else { return [] }
-        let center = Int(position.rounded())
-        let lower = max(center - visibleSpan, 0)
-        let upper = min(center + visibleSpan, labels.count - 1)
-        return Array(lower...upper)
+        geometry.visibleIndices(around: position, stopCount: labels.count, span: visibleSpan)
     }
 
-    /// Opacity for a mark `distance` stops from the indicator: full at centre,
+    /// Opacity for a tick `distance` stops from the indicator: full at centre,
     /// trailing off toward the edges but never fully invisible.
     private func fade(for distance: CGFloat) -> Double {
         max(0.12, 1 - Double(distance) * 0.13)
@@ -277,7 +275,7 @@ private extension Array {
                 Color.black.ignoresSafeArea()
                 VStack {
                     Spacer()
-                    ArcDialView(
+                    LinearDialView(
                         labels: PhotographicScale.aperture.stops.map(\.label),
                         selectedIndex: index,
                         caption: "Aperture",
@@ -300,7 +298,7 @@ private extension Array {
                 Color.black.ignoresSafeArea()
                 HStack {
                     Spacer()
-                    ArcDialView(
+                    LinearDialView(
                         labels: PhotographicScale.aperture.stops.map(\.label),
                         selectedIndex: index,
                         caption: "Aperture",
