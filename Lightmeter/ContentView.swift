@@ -154,20 +154,24 @@ struct ContentView: View {
         let advisories = tourAdvisories ?? model.advisories
 
         Group {
+            // Both layouts compose the same shared control strip, so both take
+            // the tour step; only drive the strip's tour override while the tour
+            // is actually presented, otherwise the strip stays view-local.
+            let tourStep = tour.isPresented ? tour.currentStep : nil
+
             if isLandscape {
                 LandscapeMeterLayout(
                     model: model,
                     advisories: advisories,
-                    isTourActive: tour.isPresented
+                    isTourActive: tour.isPresented,
+                    tourStep: tourStep
                 )
             } else {
                 PortraitMeterLayout(
                     model: model,
                     advisories: advisories,
                     isTourActive: tour.isPresented,
-                    // Only drive the strip's tour override while the tour is
-                    // actually presented; otherwise the strip stays view-local.
-                    tourStep: tour.isPresented ? tour.currentStep : nil
+                    tourStep: tourStep
                 )
             }
         }

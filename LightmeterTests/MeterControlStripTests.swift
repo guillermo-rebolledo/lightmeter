@@ -5,26 +5,26 @@ import Testing
 /// the guided tour force-opens for a given step, so the `.compensation`,
 /// `.meteringPattern`, and priority controls the strip hides in ordinary use
 /// still resolve their tour anchors when their step is active.
-struct PortraitControlStripTests {
+struct MeterControlStripTests {
     @Test func compensationStepOpensCompensation() {
-        #expect(PortraitControlStrip.tourSection(for: .compensation) == .compensation)
+        #expect(MeterControlStrip.tourSection(for: .compensation) == .compensation)
     }
 
     @Test func meteringPatternStepOpensPattern() {
-        #expect(PortraitControlStrip.tourSection(for: .meteringPattern) == .pattern)
+        #expect(MeterControlStrip.tourSection(for: .meteringPattern) == .pattern)
     }
 
     @Test func priorityStepOpensPriority() {
-        #expect(PortraitControlStrip.tourSection(for: .priorityAndChips) == .priority)
+        #expect(MeterControlStrip.tourSection(for: .priorityAndChips) == .priority)
     }
 
     @Test func persistentStepsForceNothingOpen() {
-        #expect(PortraitControlStrip.tourSection(for: .evReadout) == nil)
-        #expect(PortraitControlStrip.tourSection(for: .dial) == nil)
-        #expect(PortraitControlStrip.tourSection(for: .settings) == nil)
+        #expect(MeterControlStrip.tourSection(for: .evReadout) == nil)
+        #expect(MeterControlStrip.tourSection(for: .dial) == nil)
+        #expect(MeterControlStrip.tourSection(for: .settings) == nil)
     }
 
     @Test func noTourLeavesSectionsCollapsed() {
-        #expect(PortraitControlStrip.tourSection(for: nil) == nil)
+        #expect(MeterControlStrip.tourSection(for: nil) == nil)
     }
 }

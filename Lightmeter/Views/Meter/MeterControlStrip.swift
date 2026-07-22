@@ -1,11 +1,15 @@
 import SwiftUI
 
 /// The occasional exposure controls — compensation, metering pattern, and
-/// priority mode — lifted out of the persistent portrait card into an inline
+/// priority mode — lifted out of the persistent compact card into an inline
 /// expanding strip. A compact row of icon buttons sits above the chips; tapping
 /// one reveals that control inline, in a small attached surface that grows the
 /// card slightly rather than covering the frame with a large panel. Exactly one
 /// section is open at a time — opening one collapses any other.
+///
+/// A shared meter control: both orientations compose the *same* strip inside the
+/// shared `MeterHUDCard`, so its icon buttons and the tour anchors on the
+/// controls it reveals survive rotation without re-wiring.
 ///
 /// The open/collapsed state is *view-local* (`@State`), never `MeterViewModel`
 /// state. During the guided tour the strip force-opens whichever section the
@@ -15,7 +19,7 @@ import SwiftUI
 ///
 /// Under Reduce Motion the reveal is a plain swap: the height/position animation
 /// is dropped so nothing slides.
-struct PortraitControlStrip: View {
+struct MeterControlStrip: View {
     let model: MeterViewModel
     /// The guided tour's current step, or `nil` when the tour isn't running.
     /// While a step that lives in the strip is active, its section is forced
