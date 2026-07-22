@@ -47,7 +47,11 @@ struct ContentView: View {
                         onPlaceSpot: { model.placeSpot(at: $0) }
                     )
                     .ignoresSafeArea()
-                    meterOverlay
+                    PortraitMeterLayout(
+                        model: model,
+                        advisories: tourAdvisories ?? model.advisories,
+                        isTourActive: tour.isPresented
+                    )
                 case .denied:
                     CameraStatusView(status: .denied)
                 case .unavailable:
@@ -135,92 +139,6 @@ struct ContentView: View {
         .onChange(of: isVoiceOverRunning, initial: true) {
             updateTourState()
         }
-    }
-
-    /// The metering HUD floated over the preview near the bottom edge: the scene
-    /// EV@ISO100 reference above the three exposure-triangle chips, with a
-    /// permanent slot for the arc dial below them.
-    private var meterOverlay: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            VStack(spacing: 16) {
-                evReadout
-                HStack(spacing: 10) {
-                    FreezeButton(
-                        isFrozen: model.isFrozen,
-                        canFreeze: model.latestReading != nil,
-                        onToggle: model.toggleFreeze
-                    )
-                    CompensationControl(
-                        value: model.compensationLabel,
-                        isBound: model.isCompensationDialBound,
-                        onSelect: model.bindCompensationDial
-                    )
-                    .guidedTourAnchor(.compensation)
-                }
-                // Freeze advisory height for the tour so live warnings cannot
-                // shove spotlight targets between steps.
-                AdvisoriesView(advisories: tourAdvisories ?? model.advisories)
-                    .opacity(tour.isPresented ? 0 : 1)
-                    .allowsHitTesting(tour.isPresented == false)
-                    .accessibilityHidden(tour.isPresented)
-                MeteringPatternToggle(
-                    pattern: model.pattern,
-                    onSelect: { model.setPattern($0) }
-                )
-                .guidedTourAnchor(.meteringPattern)
-                VStack(spacing: 16) {
-                    PriorityModeToggle(
-                        mode: model.mode,
-                        onSelect: { model.setMode($0) }
-                    )
-                    ExposureChipsView(
-                        triangle: model.triangle,
-                        boundComponent: model.boundComponent,
-                        onSelect: { model.bindDial(to: $0) }
-                    )
-                }
-                .guidedTourAnchor(.priorityAndChips)
-            }
-            .padding(20)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .padding(.horizontal, 16)
-
-            dial
-                .padding(.top, 8)
-                .guidedTourAnchor(.arcDial)
-        }
-        .padding(.bottom, 44)
-    }
-
-    /// The shared arc dial stays mounted so its gesture area is available before
-    /// a target is bound; only its visual content changes visibility.
-    private var dial: some View {
-        ArcDialView(
-            labels: model.dialLabels,
-            selectedIndex: model.dialStopIndex,
-            caption: model.dialCaption,
-            onSelect: { model.setDialStopIndex($0) }
-        )
-    }
-
-    /// The EV@ISO100 readout — the raw reference for the scene's light level.
-    private var evReadout: some View {
-        VStack(spacing: 2) {
-            Text("EV @ ISO 100")
-                .font(.caption2.weight(.medium))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-                .tracking(1.5)
-
-            Text(model.ev.map { String(format: "%.1f", $0) } ?? "—")
-                .font(.system(size: 46, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.white)
-                .contentTransition(.numericText())
-        }
-        .animation(reduceMotion ? nil : .snappy, value: model.ev)
-        .guidedTourAnchor(.evReadout)
     }
 
     private func showTour() {
