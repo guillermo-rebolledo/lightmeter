@@ -2,9 +2,9 @@ import SwiftUI
 
 /// The metering-pattern selector (Average / Spot).
 ///
-/// A shared meter control: it carries the `.meteringPattern` tour anchor so
-/// guided-tour targeting survives orientation changes without the composing
-/// layout re-declaring the anchor.
+/// The always-visible landscape presentation of the control, carrying the
+/// `.meteringPattern` tour anchor. In portrait the same control lives inside
+/// `PortraitControlStrip`, revealed on demand, where it re-declares that anchor.
 struct MeteringPatternRow: View {
     let model: MeterViewModel
 

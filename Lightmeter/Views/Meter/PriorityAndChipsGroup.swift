@@ -1,9 +1,11 @@
 import SwiftUI
 
-/// The priority-mode toggle stacked above the exposure-triangle chips.
+/// The priority-mode toggle stacked above the exposure-triangle chips — the
+/// landscape presentation, carrying the `.priorityAndChips` tour anchor.
 ///
-/// A shared meter control: it carries the `.priorityAndChips` tour anchor so
-/// guided-tour targeting survives orientation changes.
+/// Portrait splits these apart: the chips stay in the persistent card (and carry
+/// the anchor there), while priority moves into the on-demand
+/// `PortraitControlStrip`.
 struct PriorityAndChipsGroup: View {
     let model: MeterViewModel
 

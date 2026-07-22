@@ -1,14 +1,14 @@
 import SwiftUI
 
-/// The freeze toggle paired with the exposure-compensation control.
+/// The freeze toggle paired with the exposure-compensation control — the
+/// landscape presentation, carrying the `.compensation` tour anchor on the
+/// compensation control.
 ///
-/// A shared meter control: it carries the `.compensation` tour anchor on the
-/// compensation control so guided-tour targeting survives orientation changes.
+/// Portrait no longer uses this pairing: freeze is a standalone icon in the
+/// persistent card and compensation moves into the on-demand
+/// `PortraitControlStrip` (which re-declares the `.compensation` anchor there).
 struct FreezeCompensationRow: View {
     let model: MeterViewModel
-    /// Portrait's decluttered card demotes freeze to a small icon button beside
-    /// the compensation pill; landscape keeps both as full-width pills.
-    var isCompact: Bool = false
 
     var body: some View {
         HStack(spacing: 10) {
@@ -18,7 +18,6 @@ struct FreezeCompensationRow: View {
                 // in every state the toggle accepts — including unfreezing —
                 // and the two conditions can't drift apart in a later refactor.
                 canFreeze: model.latestReading != nil || model.isFrozen,
-                isCompact: isCompact,
                 onToggle: model.toggleFreeze
             )
             CompensationControl(

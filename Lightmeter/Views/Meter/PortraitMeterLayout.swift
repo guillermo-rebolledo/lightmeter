@@ -24,20 +24,22 @@ struct PortraitMeterLayout: View {
         VStack(spacing: 0) {
             Spacer()
             VStack(spacing: 12) {
-                EVReadoutView(ev: model.ev, isCompact: true)
-                    .frame(maxWidth: .infinity)
-                    // Freeze is demoted to a small icon pinned to the card's
-                    // top-trailing corner, clear of the centered readout.
-                    .overlay(alignment: .topTrailing) {
-                        FreezeButton(
-                            isFrozen: model.isFrozen,
-                            // Mirror `toggleFreeze`'s own guard so the button
-                            // stays enabled in every state the toggle accepts.
-                            canFreeze: model.latestReading != nil || model.isFrozen,
-                            isCompact: true,
-                            onToggle: model.toggleFreeze
-                        )
-                    }
+                // Freeze is demoted to a small icon at the trailing edge; a
+                // matching empty slot on the leading edge keeps the readout
+                // centered without the icon ever overlapping it.
+                HStack(spacing: 0) {
+                    Color.clear.frame(width: 44, height: 44)
+                    EVReadoutView(ev: model.ev, isCompact: true)
+                        .frame(maxWidth: .infinity)
+                    FreezeButton(
+                        isFrozen: model.isFrozen,
+                        // Mirror `toggleFreeze`'s own guard so the button stays
+                        // enabled in every state the toggle accepts.
+                        canFreeze: model.latestReading != nil || model.isFrozen,
+                        isCompact: true,
+                        onToggle: model.toggleFreeze
+                    )
+                }
                 MeterAdvisories(advisories: advisories, isTourActive: isTourActive, isCompact: true)
                 PortraitControlStrip(model: model, tourStep: tourStep)
                 ExposureChipsView(
