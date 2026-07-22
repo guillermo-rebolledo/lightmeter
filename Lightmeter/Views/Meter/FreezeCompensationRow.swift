@@ -11,7 +11,10 @@ struct FreezeCompensationRow: View {
         HStack(spacing: 10) {
             FreezeButton(
                 isFrozen: model.isFrozen,
-                canFreeze: model.latestReading != nil,
+                // Mirror `toggleFreeze`'s own guard so the button stays enabled
+                // in every state the toggle accepts — including unfreezing —
+                // and the two conditions can't drift apart in a later refactor.
+                canFreeze: model.latestReading != nil || model.isFrozen,
                 onToggle: model.toggleFreeze
             )
             CompensationControl(
