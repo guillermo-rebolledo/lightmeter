@@ -3,17 +3,46 @@ import SwiftUI
 /// Safety guidance for the current exposure solve.
 struct AdvisoriesView: View {
     let advisories: [ExposureAdvisory]
+    /// Portrait's decluttered card collapses all advisories into one thin line;
+    /// landscape keeps each advisory on its own labeled line (it has the room).
+    var isCompact: Bool = false
 
     var body: some View {
-        if advisories.isEmpty == false {
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(advisories, id: \.self) { advisory in
-                    Label(advisory.message, systemImage: advisory.systemImage)
-                        .font(.footnote.bold())
-                        .foregroundStyle(.yellow)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .accessibilityLabel("Exposure warning: \(advisory.message)")
-                }
+        if let primary = advisories.first {
+            if isCompact {
+                compactLine(primary: primary)
+            } else {
+                stackedLines
+            }
+        }
+    }
+
+    /// The single thin line: the highest-priority advisory leads with its icon,
+    /// and any remaining warnings are joined inline so the HUD stays one card.
+    private func compactLine(primary: ExposureAdvisory) -> some View {
+        let messages = advisories.map(\.message)
+        return Label {
+            Text(messages.joined(separator: " · "))
+                .lineLimit(1)
+        } icon: {
+            Image(systemName: primary.systemImage)
+        }
+        .font(.caption)
+        .foregroundStyle(.yellow)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Exposure warnings: " + messages.joined(separator: ", "))
+    }
+
+    /// Each advisory on its own full line, for layouts with vertical room.
+    private var stackedLines: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(advisories, id: \.self) { advisory in
+                Label(advisory.message, systemImage: advisory.systemImage)
+                    .font(.footnote.bold())
+                    .foregroundStyle(.yellow)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityLabel("Exposure warning: \(advisory.message)")
             }
         }
     }

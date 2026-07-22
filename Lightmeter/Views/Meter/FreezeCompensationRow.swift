@@ -6,6 +6,9 @@ import SwiftUI
 /// compensation control so guided-tour targeting survives orientation changes.
 struct FreezeCompensationRow: View {
     let model: MeterViewModel
+    /// Portrait's decluttered card demotes freeze to a small icon button beside
+    /// the compensation pill; landscape keeps both as full-width pills.
+    var isCompact: Bool = false
 
     var body: some View {
         HStack(spacing: 10) {
@@ -15,6 +18,7 @@ struct FreezeCompensationRow: View {
                 // in every state the toggle accepts — including unfreezing —
                 // and the two conditions can't drift apart in a later refactor.
                 canFreeze: model.latestReading != nil || model.isFrozen,
+                isCompact: isCompact,
                 onToggle: model.toggleFreeze
             )
             CompensationControl(
