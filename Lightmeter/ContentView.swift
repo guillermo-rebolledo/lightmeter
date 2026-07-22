@@ -10,6 +10,7 @@ struct ContentView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityVoiceOverEnabled) private var isVoiceOverRunning
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var camera: CameraLightSource
     @State private var model: MeterViewModel
     @State private var preferences: MeterPreferences
@@ -48,11 +49,7 @@ struct ContentView: View {
                         onPlaceSpot: { model.placeSpot(at: $0) }
                     )
                     .ignoresSafeArea()
-                    PortraitMeterLayout(
-                        model: model,
-                        advisories: tourAdvisories ?? model.advisories,
-                        isTourActive: tour.isPresented
-                    )
+                    meterLayout
                 case .denied:
                     CameraStatusView(status: .denied)
                 case .unavailable:
@@ -75,7 +72,9 @@ struct ContentView: View {
                 .tint(.yellow)
                 .guidedTourAnchor(.settings)
                 .padding(.top, 4)
-                .padding(.trailing, 8)
+                // In landscape the vertical dial hugs the trailing edge; inset
+                // the gear past its thickness so the two never overlap.
+                .padding(.trailing, isLandscape ? ArcDialView.layoutThickness + 8 : 8)
             }
             // Resolve tour anchors in the same full-screen space the spotlight
             // draws into. An outer overlay under-reports Y by the top safe area,
@@ -140,6 +139,36 @@ struct ContentView: View {
         .onChange(of: isVoiceOverRunning, initial: true) {
             updateTourState()
         }
+    }
+
+    /// iPhone landscape: the compact vertical size class drives the edge layout.
+    private var isLandscape: Bool { verticalSizeClass == .compact }
+
+    /// The meter HUD, arranged for the current orientation. Both containers
+    /// compose the same shared control views (with stable tour anchors) over the
+    /// preview, so rotating reflows the controls without tearing down the camera.
+    /// The reflow rides a single `verticalSizeClass`-keyed implicit animation —
+    /// pills glide to their new homes and the dial cross-fades across the axis
+    /// flip — collapsing to a plain swap under Reduce Motion.
+    @ViewBuilder private var meterLayout: some View {
+        let advisories = tourAdvisories ?? model.advisories
+
+        Group {
+            if isLandscape {
+                LandscapeMeterLayout(
+                    model: model,
+                    advisories: advisories,
+                    isTourActive: tour.isPresented
+                )
+            } else {
+                PortraitMeterLayout(
+                    model: model,
+                    advisories: advisories,
+                    isTourActive: tour.isPresented
+                )
+            }
+        }
+        .animation(reduceMotion ? nil : .smooth, value: verticalSizeClass)
     }
 
     private func showTour() {
