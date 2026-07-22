@@ -14,14 +14,7 @@ struct FreezeButton: View {
     var body: some View {
         Button(action: onToggle) {
             label
-                .background(
-                    isFrozen ? AnyShapeStyle(.tint.opacity(0.22)) : AnyShapeStyle(.white.opacity(0.08)),
-                    in: Capsule()
-                )
-                .overlay(
-                    Capsule()
-                        .strokeBorder(.tint.opacity(isFrozen ? 0.8 : 0), lineWidth: 1)
-                )
+                .modifier(GlassPillBackground(isActive: isFrozen))
         }
         .buttonStyle(.plain)
         .disabled(canFreeze == false)

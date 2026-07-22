@@ -60,13 +60,12 @@ struct MeterHUDCard: View {
             }
         }
         .padding(14)
-        // Material stays `.ultraThinMaterial`; the background layer alone is
-        // dialed back so more of the preview shows through — the card reads as
-        // more transparent without dimming the controls in front of it.
-        .background {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .opacity(0.82)
-        }
+        // Liquid Glass on iOS 26, the dialed-back `.ultraThinMaterial` on the
+        // iOS 17/18 floor (see `GlassCardBackground`). The card and every glass
+        // control it holds — freeze, the strip buttons, the chips — share one
+        // `GlassEffectContainer` via `glassGroup()` so adjacent glass blends as a
+        // single system; on the fallback that grouping is a passthrough.
+        .modifier(GlassCardBackground())
+        .glassGroup()
     }
 }

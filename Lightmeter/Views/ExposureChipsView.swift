@@ -98,7 +98,7 @@ private struct ValueChip: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 11)
         .padding(.horizontal, 8)
-        .background(chipBackground)
+        .modifier(GlassChipBackground(isSolved: isSolved, isBound: isBound))
     }
 
     // The solved leg is accent-tinted throughout; the set legs read as plain
@@ -111,28 +111,6 @@ private struct ValueChip: View {
         isSolved ? AnyShapeStyle(.tint) : AnyShapeStyle(.white)
     }
 
-    // Solved: a faint accent wash. Bound: a brighter fill with an accent ring so
-    // it reads as the active dial. Otherwise plain white-on-glass.
-    private var chipBackground: some View {
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .fill(fillStyle)
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(.tint.opacity(strokeOpacity), lineWidth: isBound ? 1.5 : 1)
-            )
-    }
-
-    private var fillStyle: AnyShapeStyle {
-        if isSolved { return AnyShapeStyle(.tint.opacity(0.16)) }
-        if isBound { return AnyShapeStyle(.tint.opacity(0.22)) }
-        return AnyShapeStyle(.white.opacity(0.08))
-    }
-
-    private var strokeOpacity: Double {
-        if isBound { return 0.9 }
-        if isSolved { return 0.55 }
-        return 0
-    }
 }
 
 #Preview {
