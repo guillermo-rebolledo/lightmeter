@@ -37,7 +37,6 @@ struct CameraStatusView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
 
             if showsSettingsLink,
                let settingsURL = URL(string: UIApplication.openSettingsURLString) {
@@ -46,6 +45,11 @@ struct CameraStatusView: View {
                     .padding(.top, 4)
             }
         }
+        .padding(.horizontal, 40)
+        // Cap the copy to a comfortable measure and center it, so the message
+        // stays legible in landscape instead of stretching to the full width.
+        .frame(maxWidth: 420)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
     }
 }
