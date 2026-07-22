@@ -3,11 +3,11 @@ import SwiftUI
 /// The exposure triangle as three value chips — ISO, aperture, shutter — floated
 /// over the preview. The solved leg (shutter in aperture-priority) is tinted and
 /// marked non-editable; the two set legs read as plain values and can be tapped
-/// to bind the arc dial. The chip the dial is bound to is highlighted. Values
+/// to bind the ruler dial. The chip the dial is bound to is highlighted. Values
 /// animate as the light changes.
 struct ExposureChipsView: View {
     let triangle: ExposureTriangle
-    /// Which leg the arc dial is currently bound to, or `nil` when no dial is
+    /// Which leg the ruler dial is currently bound to, or `nil` when no dial is
     /// active — the chip to highlight as selected.
     let boundComponent: ExposureComponent?
     /// Called when an editable chip is tapped, to bind (or unbind) the dial.
@@ -49,7 +49,7 @@ struct ExposureChipsView: View {
 
 /// A single exposure-triangle chip: a caption over a value. The solved leg is
 /// accent-tinted, announced as solved and non-editable, and not tappable. A set
-/// leg is a button that binds the arc dial; while bound it shows a selected ring.
+/// leg is a button that binds the ruler dial; while bound it shows a selected ring.
 private struct ValueChip: View {
     let caption: String
     let value: String

@@ -116,7 +116,7 @@ final class GuidedTourController {
             break
         case .meteringPattern:
             model.setPattern(.spot)
-        case .arcDial:
+        case .dial:
             if model.boundComponent != .iso {
                 model.bindDial(to: .iso)
             }

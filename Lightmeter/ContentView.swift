@@ -74,7 +74,7 @@ struct ContentView: View {
                 .padding(.top, 4)
                 // In landscape the vertical dial hugs the trailing edge; inset
                 // the gear past its thickness so the two never overlap.
-                .padding(.trailing, isLandscape ? ArcDialView.layoutThickness + 8 : 8)
+                .padding(.trailing, isLandscape ? LinearDialView.layoutThickness + 8 : 8)
             }
             // Resolve tour anchors in the same full-screen space the spotlight
             // draws into. An outer overlay under-reports Y by the top safe area,

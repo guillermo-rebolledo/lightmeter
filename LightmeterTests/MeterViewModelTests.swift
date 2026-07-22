@@ -298,7 +298,7 @@ struct MeterViewModelTests {
         #expect(vm.triangle.shutter?.label == "1/60")
     }
 
-    /// The compensation control binds the same arc dial at zero, and three
+    /// The compensation control binds the same ruler dial at zero, and three
     /// one-third-stop detents move it to +1 EV.
     @Test func compensationControlUsesTheSharedDetentedDial() throws {
         let vm = MeterViewModel(source: FakeLightSource())
