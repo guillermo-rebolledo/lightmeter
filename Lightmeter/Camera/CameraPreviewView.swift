@@ -53,7 +53,7 @@ struct CameraPreviewView: UIViewRepresentable {
         // The session is already attached, so the layer's connection exists.
         context.coordinator.startTrackingRotation(
             device: captureDevice,
-            previewLayer: view.videoPreviewLayer
+            previewView: view
         )
         return view
     }
@@ -85,30 +85,35 @@ struct CameraPreviewView: UIViewRepresentable {
             self.isSpotActive = isSpotActive
         }
 
-        /// Begins driving `previewLayer`'s connection rotation from the device's
+        /// Begins driving the preview connection's rotation from the device's
         /// horizon-level preview angle. `.initial` applies the current angle up
         /// front, then each subsequent orientation change flows through KVO. The
         /// AVFoundation-managed rotation is what keeps `captureDevicePointConverted`
         /// mapping taps correctly after a rotation, so spot metering stays aligned.
         func startTrackingRotation(
             device: AVCaptureDevice?,
-            previewLayer: AVCaptureVideoPreviewLayer
+            previewView: PreviewView
         ) {
             // No device (e.g. the Simulator) means no preview to keep upright.
             guard let device else { return }
             let coordinator = AVCaptureDevice.RotationCoordinator(
-                device: device, previewLayer: previewLayer
+                device: device, previewLayer: previewView.videoPreviewLayer
             )
             rotationCoordinator = coordinator
             rotationObservation = coordinator.observe(
                 \.videoRotationAngleForHorizonLevelPreview,
                 options: [.initial, .new]
-            ) { [weak previewLayer] observed, _ in
-                guard let previewLayer else { return }
+            ) { [weak previewView] observed, _ in
+                guard let previewView else { return }
                 Self.applyRotation(
                     observed.videoRotationAngleForHorizonLevelPreview,
-                    to: previewLayer
+                    to: previewView.videoPreviewLayer
                 )
+                // The new connection angle remaps device points to layer points,
+                // so re-pin the reticle now rather than waiting for the next
+                // layout pass — the view's bounds don't change on rotation while
+                // the app is orientation-locked, so no layout pass is guaranteed.
+                previewView.refreshReticle()
             }
         }
 
@@ -178,6 +183,13 @@ struct CameraPreviewView: UIViewRepresentable {
 
         override func layoutSubviews() {
             super.layoutSubviews()
+            positionReticle()
+        }
+
+        /// Re-pins the reticle to its device point after the preview connection's
+        /// rotation changes — that remaps device points to layer points without
+        /// necessarily triggering a layout pass.
+        func refreshReticle() {
             positionReticle()
         }
 
