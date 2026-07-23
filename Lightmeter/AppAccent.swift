@@ -4,11 +4,10 @@ import SwiftUI
 ///
 /// Everything that used to reach for `.yellow` on its own (the container
 /// `.tint`, the Liquid Glass `glassAccent`, the spot reticle) now reads from
-/// here, so re-theming the app is a one-line change. This portrait usability
-/// variant sets the accent to orange; the exact production hex is matched in
-/// the final integrate-and-verify ticket.
+/// here, so re-theming the app is a one-line change. The exact production hex
+/// is matched in the final integrate-and-verify ticket.
 extension Color {
-    static let appAccent = Color.orange
+    static let appAccent = Color.yellow
 }
 
 extension UIColor {
