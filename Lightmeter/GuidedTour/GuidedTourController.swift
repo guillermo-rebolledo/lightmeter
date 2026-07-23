@@ -112,7 +112,7 @@ final class GuidedTourController {
         guard let model, let currentStep else { return }
 
         switch currentStep {
-        case .evReadout, .priorityAndChips:
+        case .welcome, .evReadout, .priorityAndChips:
             break
         case .meteringPattern:
             model.setPattern(.spot)

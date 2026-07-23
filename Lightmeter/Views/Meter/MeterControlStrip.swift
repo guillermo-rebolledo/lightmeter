@@ -42,7 +42,7 @@ struct MeterControlStrip: View {
         case .meteringPattern: .pattern
         case .compensation: .compensation
         case .priorityAndChips: .priority
-        case .evReadout, .dial, .settings, .none: nil
+        case .welcome, .evReadout, .dial, .settings, .none: nil
         }
     }
 

@@ -16,7 +16,7 @@ struct GuidedTourControllerTests {
 
         controller.update(for: .metering, isMeterReady: true, isVoiceOverRunning: false)
         #expect(controller.isPresented)
-        #expect(controller.currentStep == .evReadout)
+        #expect(controller.currentStep == .welcome)
     }
 
     @Test("Completing or skipping the tour records it as seen", arguments: [false, true])
@@ -44,9 +44,11 @@ struct GuidedTourControllerTests {
         let (controller, _) = makeController()
         controller.update(for: .metering, isMeterReady: true, isVoiceOverRunning: false)
 
+        #expect(GuidedTourStep.allCases.first == .welcome)
+
         for (index, expectedStep) in GuidedTourStep.allCases.enumerated() {
             #expect(controller.currentStep == expectedStep)
-            #expect(controller.progressLabel == "\(index + 1) of 6")
+            #expect(controller.progressLabel == "\(index + 1) of 7")
             controller.advance()
         }
 
@@ -60,7 +62,9 @@ struct GuidedTourControllerTests {
     func enteringStepsChoreographsMeterState() {
         let (controller, _, model) = makeControllerWithModel()
         controller.update(for: .metering, isMeterReady: true, isVoiceOverRunning: false)
+        #expect(controller.currentStep == .welcome)
 
+        controller.advance()
         controller.advance()
         #expect(controller.currentStep == .meteringPattern)
         #expect(model.pattern == .spot)
@@ -77,6 +81,7 @@ struct GuidedTourControllerTests {
     func liveReadingsDoNotResetProgress() {
         let (controller, _, model) = makeControllerWithModel()
         controller.update(for: .metering, isMeterReady: true, isVoiceOverRunning: false)
+        controller.advance()
         controller.advance()
         #expect(controller.currentStep == .meteringPattern)
 
@@ -139,7 +144,7 @@ struct GuidedTourControllerTests {
         _ = try #require(model.latestReading)
 
         controller.update(for: .metering, isMeterReady: true, isVoiceOverRunning: false)
-        for _ in 0..<5 {
+        for _ in 0..<6 {
             controller.advance()
         }
 
@@ -173,7 +178,7 @@ struct GuidedTourControllerTests {
         )
 
         #expect(controller.isPresented)
-        #expect(controller.currentStep == .evReadout)
+        #expect(controller.currentStep == .welcome)
     }
 
     @Test(
