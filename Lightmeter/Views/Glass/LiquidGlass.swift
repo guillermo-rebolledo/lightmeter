@@ -15,10 +15,10 @@ import SwiftUI
 /// the *same* control instances, applying these here changes both orientations at
 /// once.
 
-/// The app's accent, matched to the `.tint(.yellow)` applied at the container
+/// The app's accent, matched to the `.tint(.appAccent)` applied at the container
 /// level so a glass `tint(_:)` and the fallback's `.tint` shape style read the
-/// same colour.
-private let glassAccent: Color = .yellow
+/// same colour. Reads from the single ``Color/appAccent`` token.
+private let glassAccent: Color = .appAccent
 
 extension View {
     /// Wraps the receiver in a `GlassEffectContainer` on iOS 26 so its glass and

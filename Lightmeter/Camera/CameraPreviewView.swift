@@ -213,7 +213,7 @@ private final class ReticleView: UIView {
         super.init(frame: CGRect(x: 0, y: 0, width: Self.side, height: Self.side))
         isUserInteractionEnabled = false
 
-        let accent = UIColor.systemYellow.cgColor
+        let accent = UIColor.appAccent.cgColor
         shape.path = Self.bracketPath(side: Self.side)
         shape.strokeColor = accent
         shape.fillColor = UIColor.clear.cgColor

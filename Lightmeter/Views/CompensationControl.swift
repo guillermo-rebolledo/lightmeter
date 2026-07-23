@@ -44,6 +44,6 @@ struct CompensationControl: View {
         CompensationControl(value: "+1.0 EV", isBound: true, onSelect: {})
             .padding()
     }
-    .tint(.yellow)
+    .tint(.appAccent)
     .preferredColorScheme(.dark)
 }
