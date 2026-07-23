@@ -29,6 +29,15 @@ struct SolvedLegReadout: Equatable {
     /// pending (before the first reading), which the view shows as a
     /// placeholder rather than a stale value.
     let value: String?
+
+    /// What VoiceOver reads in place of the caption — the same words, since the
+    /// caption already names the leg and the ISO it answers at.
+    var accessibilityLabel: String { caption }
+
+    /// What VoiceOver reads in place of the value. The view shows an em-dash
+    /// while the solve is pending; spoken, a dash is meaningless (and some voices
+    /// say nothing at all), so the pending state is said in words.
+    var accessibilityValue: String { value ?? "Pending" }
 }
 
 extension SolvedLegReadout {

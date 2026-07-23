@@ -32,7 +32,7 @@ struct GuidedTourOverlay: View {
 
                     Button("Skip", action: onSkip)
                         .font(.body.bold())
-                        .foregroundStyle(.yellow)
+                        .foregroundStyle(Color.appAccent)
                         .frame(minWidth: 44, minHeight: 44)
                 }
                 Spacer()

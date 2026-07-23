@@ -43,9 +43,11 @@ struct SolvedLegReadoutView: View {
         }
         .animation(reduceMotion ? nil : .snappy, value: triangle)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(readout.caption)
-        // The em-dash placeholder is meaningless read aloud, so pending is said.
-        .accessibilityValue(readout.value ?? "Pending")
+        // The spoken strings live on the readout, so what the hero says is
+        // testable without a view — the em-dash placeholder is meaningless read
+        // aloud, so pending is said in words there.
+        .accessibilityLabel(readout.accessibilityLabel)
+        .accessibilityValue(readout.accessibilityValue)
         .guidedTourAnchor(.evReadout)
     }
 }
