@@ -59,12 +59,19 @@
 			);
 			target = C5B4583030109458002D6653 /* LightmeterWidgetsExtension */;
 		};
+		C5B45A663011D669002D6653 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				LaunchLightmeterIntent.swift,
+			);
+			target = 1A0000000000000000000010 /* Lightmeter */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		1A0000000000000000000020 /* Lightmeter */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Lightmeter; sourceTree = "<group>"; };
 		1A0000000000000000000021 /* LightmeterTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = LightmeterTests; sourceTree = "<group>"; };
-		C5B4583730109458002D6653 /* LightmeterWidgets */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (C5B4584630109459002D6653 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = LightmeterWidgets; sourceTree = "<group>"; };
+		C5B4583730109458002D6653 /* LightmeterWidgets */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (C5B45A663011D669002D6653 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, C5B4584630109459002D6653 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = LightmeterWidgets; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
