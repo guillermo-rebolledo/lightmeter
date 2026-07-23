@@ -62,12 +62,12 @@ enum GuidedTourStep: Hashable, CaseIterable {
             """
         case .priorityAndChips:
             """
-            Priority: pick which setting you control. Aperture is the lens \
-            opening (the f-number) that also sets how much is in focus; shutter \
-            is how long the sensor is exposed. Choose Aperture and you set the \
-            f-number while the app works out the shutter speed for you (or the \
-            reverse). The solved chip follows the light, with advisories when \
-            the result needs support.
+            These three chips are your exposure. Aperture is the lens opening \
+            (the f-number) that also sets how much is in focus; shutter is how \
+            long the sensor is exposed. The chip marked AUTO is the one the app \
+            is working out for you — tap it to take control of that setting, and \
+            the app switches to solving the other one instead. ISO stays yours \
+            to set in both.
             """
         case .dial:
             """

@@ -39,4 +39,11 @@ enum PriorityMode: CaseIterable, Equatable, Sendable {
         case .shutterPriority: return .aperturePriority
         }
     }
+
+    /// The mode that locks `component` as its priority (photographer-controlled)
+    /// leg, or `nil` for a leg no mode can lock — ISO, which is always an input.
+    /// Tapping an AUTO chip claims this mode so the tapped leg becomes editable.
+    static func locking(_ component: ExposureComponent) -> PriorityMode? {
+        allCases.first { $0.lockedComponent == component }
+    }
 }
