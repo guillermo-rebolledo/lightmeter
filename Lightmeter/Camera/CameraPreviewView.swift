@@ -29,6 +29,12 @@ struct CameraPreviewView: UIViewRepresentable {
     /// place a spot only then.
     var isSpotActive: Bool
 
+    /// The EV readout to badge the reticle with, or `nil` when EV isn't riding
+    /// the reticle (average metering, no placed spot, or no reading yet). The
+    /// whole readout rather than its string so the badge speaks the same
+    /// label/value VoiceOver gets everywhere else; only its `badgeValue` shows.
+    var evReadout: PreviewEVReadout?
+
     /// Called with the normalized device point when the photographer taps to place
     /// a spot.
     var onPlaceSpot: (CGPoint) -> Void
@@ -62,7 +68,7 @@ struct CameraPreviewView: UIViewRepresentable {
         uiView.videoPreviewLayer.session = session
         context.coordinator.onPlaceSpot = onPlaceSpot
         context.coordinator.isSpotActive = isSpotActive
-        uiView.updateReticle(devicePoint: spot, visible: isSpotActive)
+        uiView.updateReticle(devicePoint: spot, visible: isSpotActive, badge: evReadout)
     }
 
     /// Bridges the tap gesture to `onPlaceSpot`, converting the touch location to
@@ -174,10 +180,12 @@ struct CameraPreviewView: UIViewRepresentable {
         }
 
         /// Pins the reticle to `devicePoint` (or center when `nil`) and shows it
-        /// only while spot metering is `visible`.
-        func updateReticle(devicePoint: CGPoint?, visible: Bool) {
+        /// only while spot metering is `visible`, carrying `badge`'s EV reading
+        /// inline when there is one to show.
+        func updateReticle(devicePoint: CGPoint?, visible: Bool, badge: PreviewEVReadout?) {
             reticleDevicePoint = devicePoint ?? .frameCenter
             reticle.isHidden = !visible
+            reticle.showBadge(badge)
             positionReticle()
         }
 
@@ -203,15 +211,27 @@ struct CameraPreviewView: UIViewRepresentable {
 }
 
 /// The spot-metering reticle: a tap-to-focus-style square with corner-only ticks
-/// and a center dot, tinted to match the meter's accent.
+/// and a center dot, tinted to match the meter's accent, carrying the metered
+/// point's EV as an inline badge beneath it.
+///
+/// The badge lives here, in UIKit, rather than as a SwiftUI overlay because only
+/// the preview layer can map the spot's normalized device point to a layer point
+/// — riding the reticle is what keeps EV glued to the tone it describes across
+/// layout and rotation.
 private final class ReticleView: UIView {
     private static let side: CGFloat = 78
+    /// Clears the bracket without drifting far from the point it annotates.
+    private static let badgeGap: CGFloat = 6
     private let shape = CAShapeLayer()
     private let dot = CAShapeLayer()
+    private let badge = ReticleBadgeLabel()
 
     init() {
         super.init(frame: CGRect(x: 0, y: 0, width: Self.side, height: Self.side))
         isUserInteractionEnabled = false
+        // The badge hangs below the bracket, outside these bounds.
+        clipsToBounds = false
+        addSubview(badge)
 
         let accent = UIColor.appAccent.cgColor
         shape.path = Self.bracketPath(side: Self.side)
@@ -242,6 +262,31 @@ private final class ReticleView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    /// Shows `readout`'s EV inline under the bracket, or hides the badge when
+    /// there is no reading to attribute to this point.
+    func showBadge(_ readout: PreviewEVReadout?) {
+        guard let value = readout?.badgeValue else {
+            badge.isHidden = true
+            return
+        }
+        badge.isHidden = false
+        badge.text = value
+        badge.accessibilityLabel = readout?.accessibilityLabel
+        badge.accessibilityValue = readout?.accessibilityValue
+        setNeedsLayout()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let size = badge.intrinsicContentSize
+        badge.frame = CGRect(
+            x: (Self.side - size.width) / 2,
+            y: Self.side + Self.badgeGap,
+            width: size.width,
+            height: size.height
+        )
+    }
+
     /// Four L-shaped corner brackets inset within a `side × side` square.
     private static func bracketPath(side: CGFloat) -> CGPath {
         let path = UIBezierPath()
@@ -261,4 +306,61 @@ private final class ReticleView: UIView {
 
         return path.cgPath
     }
+}
+
+/// The reticle's inline EV badge: the metered point's reading on a small dark
+/// capsule, sized to its own text.
+///
+/// It floats on the raw scene, which can be a blown-out sky, so it carries the
+/// same kind of legibility scrim the pills and the HUD drawer do rather than
+/// relying on white-on-nothing. Digits are monospaced so a live-updating reading
+/// doesn't jitter the capsule's width under the photographer's eye.
+private final class ReticleBadgeLabel: UILabel {
+    /// Padding around the text, applied both to the drawn text and to the
+    /// intrinsic size so the capsule is never tighter than what it draws.
+    private static let insets = UIEdgeInsets(top: 3, left: 8, bottom: 3, right: 8)
+
+    init() {
+        super.init(frame: .zero)
+        isHidden = true
+        textColor = .white
+        // Matched to the scrim the floating pills use over the same preview.
+        backgroundColor = UIColor.black.withAlphaComponent(0.55)
+        textAlignment = .center
+        font = Self.badgeFont
+        adjustsFontForContentSizeCategory = true
+        layer.masksToBounds = true
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var intrinsicContentSize: CGSize {
+        let size = super.intrinsicContentSize
+        return CGSize(
+            width: size.width + Self.insets.left + Self.insets.right,
+            height: size.height + Self.insets.top + Self.insets.bottom
+        )
+    }
+
+    override func drawText(in rect: CGRect) {
+        super.drawText(in: rect.inset(by: Self.insets))
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        layer.cornerRadius = bounds.height / 2
+    }
+
+    /// The meter's rounded, monospaced-digit face, scaled with Dynamic Type but
+    /// capped: the badge annotates a point in the frame, so at the accessibility
+    /// sizes it grows to stay readable without covering the scene it describes.
+    private static let badgeFont: UIFont = {
+        let base = UIFont.monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
+        let rounded = base.fontDescriptor.withDesign(.rounded)
+            .map { UIFont(descriptor: $0, size: base.pointSize) } ?? base
+        return UIFontMetrics(forTextStyle: .caption1)
+            .scaledFont(for: rounded, maximumPointSize: 22)
+    }()
 }
