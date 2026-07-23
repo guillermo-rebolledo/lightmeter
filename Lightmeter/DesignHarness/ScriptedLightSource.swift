@@ -14,14 +14,15 @@ import Foundation
 /// streams for as long as the screen is up, and `MeterViewModel` leaves
 /// `.metering` when its stream finishes — a one-shot source would quietly change
 /// the state the screen is screenshotted in.
+///
+/// `LightSource` is deliberately not `@MainActor` (the real camera works on its
+/// own queues), so this one's mutable state is guarded by a lock, the same way
+/// `CameraLightSource`'s sampler guards the continuation it swaps between
+/// sessions. Today's only caller is the main-actor view-model, but the protocol
+/// does not promise that.
 final class ScriptedLightSource: LightSource {
     /// The scene's EV@ISO 100 — what the meter will read.
     let sceneEV: Double
-
-    /// The last exposure point of interest the view-model routed, so spot
-    /// metering stays drivable under the harness even with nothing to aim.
-    /// `nil` is whole-frame average.
-    private(set) var exposurePointOfInterest: CGPoint?
 
     /// How often a reading is republished. Slow enough to cost nothing, frequent
     /// enough that the screen is genuinely live under the harness.
@@ -33,7 +34,10 @@ final class ScriptedLightSource: LightSource {
     private static let fixedISO: Double = 100
     private static let fixedAperture: Double = 8
 
+    private let lock = NSLock()
     private var emitTask: Task<Void, Never>?
+    private var activeContinuation: AsyncStream<LightReading>.Continuation?
+    private var routedExposurePoint: CGPoint?
 
     init(sceneEV: Double) {
         self.sceneEV = sceneEV
@@ -41,6 +45,14 @@ final class ScriptedLightSource: LightSource {
 
     deinit {
         emitTask?.cancel()
+        activeContinuation?.finish()
+    }
+
+    /// The last exposure point of interest the view-model routed, so spot
+    /// metering stays drivable under the harness even with nothing to aim.
+    /// `nil` is whole-frame average.
+    var exposurePointOfInterest: CGPoint? {
+        lock.withLock { routedExposurePoint }
     }
 
     /// The sample this source publishes: the fixed ISO and aperture, with the
@@ -70,13 +82,14 @@ final class ScriptedLightSource: LightSource {
         let (stream, continuation) = AsyncStream<LightReading>.makeStream(
             bufferingPolicy: .bufferingNewest(1)
         )
-
-        // Defensive, mirroring the camera: a start() without a matching stop()
-        // finishes the prior session's stream rather than leaving it hanging.
-        emitTask?.cancel()
-
         let reading = self.reading
-        emitTask = Task {
+
+        // Detached so the emit loop doesn't inherit the caller's actor: the
+        // camera samples on its own queues, and the stand-in should not quietly
+        // hop the main actor every tick. The stream is finished by whoever ends
+        // the session — `stop()` or `deinit` — never by this loop, so a
+        // cancellation can't look to the view-model like capture died.
+        let task = Task.detached {
             // Yield the first reading immediately so the meter is live on the
             // first frame — a screenshot taken right after launch is a screenshot
             // of the metering screen, not of the pre-first-reading state.
@@ -86,19 +99,42 @@ final class ScriptedLightSource: LightSource {
                 guard Task.isCancelled == false else { break }
                 continuation.yield(reading)
             }
-            continuation.finish()
         }
+
+        // Defensive, mirroring the camera: a start() without a matching stop()
+        // finishes the prior session's stream rather than leaving its consumer
+        // hanging.
+        endSession(replacingWith: (task, continuation))
 
         return stream
     }
 
     func stop() {
-        emitTask?.cancel()
-        emitTask = nil
+        endSession(replacingWith: nil)
+    }
+
+    /// Cancels the current emit loop and finishes its stream, optionally
+    /// installing `next` as the new session in the same locked step.
+    ///
+    /// The stream is finished here rather than inside the emit task because the
+    /// protocol says `stop()` finishes the stream returned by the matching
+    /// `start()` — waiting for a cancelled task to notice would let one more
+    /// queued reading land after the caller believes metering has ended.
+    private func endSession(
+        replacingWith next: (Task<Void, Never>, AsyncStream<LightReading>.Continuation)?
+    ) {
+        let previous = lock.withLock {
+            let previous = (task: emitTask, continuation: activeContinuation)
+            emitTask = next?.0
+            activeContinuation = next?.1
+            return previous
+        }
+        previous.task?.cancel()
+        previous.continuation?.finish()
     }
 
     func setExposurePointOfInterest(_ point: CGPoint?) {
-        exposurePointOfInterest = point
+        lock.withLock { routedExposurePoint = point }
     }
 }
 #endif

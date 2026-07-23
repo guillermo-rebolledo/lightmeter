@@ -78,5 +78,15 @@ enum DesignHarness {
     static func makeLightSource() -> LightSource? {
         configuration.map { ScriptedLightSource(sceneEV: $0.sceneEV) }
     }
+
+    /// The scene to draw where there is no capture device.
+    ///
+    /// Falls back to the same scene `DesignHarnessConfiguration.parse` defaults
+    /// to, so a backdrop drawn without a parsed configuration (a SwiftUI preview,
+    /// a test) is the one the harness would have chosen anyway rather than an
+    /// arbitrary third answer.
+    static var backdropScene: StandInScene {
+        configuration?.scene ?? .blownSky
+    }
 }
 #endif

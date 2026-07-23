@@ -46,10 +46,11 @@ enum StandInScene: String, CaseIterable {
 ///
 /// Spot metering is reproduced here too: the reticle normally lives inside
 /// `CameraPreviewView`, pinned through the preview layer's device-point
-/// conversion, which has nothing to convert without a capture device. This is a
-/// deliberate approximation of that bracket — close enough to judge layout and
-/// contrast against, not the same code — so spot mode stays inspectable under the
-/// harness.
+/// conversion, which has nothing to convert without a capture device. The
+/// stand-in redraws it in SwiftUI, but from the *same* ``ReticleGeometry`` the
+/// shipped one strokes, so the two can't drift apart on the dimensions that
+/// matter. What differs is only where it's anchored: view bounds here, sensor
+/// space on-device.
 struct StandInSceneView: View {
     let scene: StandInScene
 
@@ -64,6 +65,11 @@ struct StandInSceneView: View {
     /// The readout badging the reticle, or `nil` when EV isn't riding it.
     var evReadout: PreviewEVReadout?
 
+    /// Called with a normalized point when the photographer taps to place a spot,
+    /// so spot metering is actually *drivable* under the harness and not just
+    /// visible. Defaults to doing nothing for the previews below.
+    var onPlaceSpot: (CGPoint) -> Void = { _ in }
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -76,6 +82,18 @@ struct StandInSceneView: View {
                             y: (spot?.y ?? 0.5) * geometry.size.height
                         )
                 }
+            }
+            // Only spot metering places a spot, mirroring the shipped preview's
+            // coordinator: a stray tap in average mode must not switch the mode.
+            .contentShape(Rectangle())
+            .onTapGesture { location in
+                guard isSpotActive else { return }
+                onPlaceSpot(
+                    CGPoint(
+                        x: location.x / geometry.size.width,
+                        y: location.y / geometry.size.height
+                    )
+                )
             }
         }
         .background(.black)
@@ -278,18 +296,23 @@ private struct Ridgeline: Shape {
 private struct StandInReticle: View {
     let readout: PreviewEVReadout?
 
-    private static let side: CGFloat = 78
-
-    /// Clears the bracket without drifting far from the point it annotates —
-    /// the shipped reticle's own gap.
-    private static let badgeGap: CGFloat = 6
+    /// Read from the same `ReticleGeometry` the shipped UIKit reticle draws
+    /// from, so the harness cannot silently drift away from the bracket it is
+    /// standing in for.
+    private static let side = ReticleGeometry.side
+    private static let badgeGap = ReticleGeometry.badgeGap
 
     var body: some View {
         ReticleBrackets()
             .stroke(Color.appAccent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
             .frame(width: Self.side, height: Self.side)
             .overlay {
-                Circle().fill(Color.appAccent).frame(width: 4, height: 4)
+                Circle()
+                    .fill(Color.appAccent)
+                    .frame(
+                        width: ReticleGeometry.dotRadius * 2,
+                        height: ReticleGeometry.dotRadius * 2
+                    )
             }
             .shadow(color: .black.opacity(0.4), radius: 2)
             // The badge hangs *below* the bracket without moving it: the bracket
@@ -303,7 +326,7 @@ private struct StandInReticle: View {
     }
 
     @ViewBuilder private var badge: some View {
-        if let value = readout?.badgeValue {
+        if let readout, let value = readout.badgeValue {
             Text(value)
                 .font(.caption.weight(.semibold).monospacedDigit())
                 .foregroundStyle(.white)
@@ -311,35 +334,26 @@ private struct StandInReticle: View {
                 .padding(.vertical, 3)
                 .background(.black.opacity(0.55), in: Capsule())
                 .fixedSize()
+                // Named and qualified exactly as the shipped badge is: read as
+                // its own text this would be a bare "EV 12.3", with no hint of
+                // which read it describes or the ISO it is quoted at (ADR-0001).
+                .accessibilityElement()
+                .accessibilityLabel(readout.accessibilityLabel)
+                .accessibilityValue(readout.accessibilityValue)
         }
     }
 }
 
-/// Four L-shaped corner brackets, mirroring the shipped reticle's geometry.
+/// The shipped reticle's four L-shaped corner brackets, stroked from the shared
+/// `ReticleGeometry` polylines rather than from its own copy of the numbers.
 private struct ReticleBrackets: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        let inset: CGFloat = 2
-        let tick = rect.width * 0.22
-        let lo = inset
-        let hi = rect.width - inset
-
-        path.move(to: CGPoint(x: lo, y: lo + tick))
-        path.addLine(to: CGPoint(x: lo, y: lo))
-        path.addLine(to: CGPoint(x: lo + tick, y: lo))
-
-        path.move(to: CGPoint(x: hi - tick, y: lo))
-        path.addLine(to: CGPoint(x: hi, y: lo))
-        path.addLine(to: CGPoint(x: hi, y: lo + tick))
-
-        path.move(to: CGPoint(x: hi, y: hi - tick))
-        path.addLine(to: CGPoint(x: hi, y: hi))
-        path.addLine(to: CGPoint(x: hi - tick, y: hi))
-
-        path.move(to: CGPoint(x: lo + tick, y: hi))
-        path.addLine(to: CGPoint(x: lo, y: hi))
-        path.addLine(to: CGPoint(x: lo, y: hi - tick))
-
+        for corner in ReticleGeometry.bracketPolylines(side: rect.width) {
+            guard let start = corner.first else { continue }
+            path.move(to: start)
+            path.addLines(Array(corner.dropFirst()))
+        }
         return path
     }
 }

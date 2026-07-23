@@ -45,34 +45,39 @@ structure — a hard edge, a hot spot, a deep shadow — and that is what they c
 From the repository root. Substitute any available simulator name.
 
 ```sh
-DEVICE="iPhone 17 Pro"
+DEVICE_NAME="iPhone 17 Pro"
 BUNDLE_ID=dev.gortiz.Lightmeter
 DERIVED=/tmp/lightmeter-harness
+
+# 0. Resolve one UDID. Several runtimes can offer the same device name, and
+#    every later step has to address the *same* simulator.
+UDID=$(xcrun simctl list devices available --json \
+  | python3 -c "import json,sys;print(next(d['udid'] for v in json.load(sys.stdin)['devices'].values() for d in v if d['name']=='$DEVICE_NAME'))")
 
 # 1. Build the debug app for the Simulator.
 xcodebuild \
   -project Lightmeter.xcodeproj \
   -scheme Lightmeter \
-  -destination "platform=iOS Simulator,name=$DEVICE,OS=latest" \
+  -destination "platform=iOS Simulator,id=$UDID" \
   -derivedDataPath "$DERIVED" \
   build
 
 # 2. Boot the simulator and wait for it.
-xcrun simctl boot "$DEVICE" 2>/dev/null || true
-xcrun simctl bootstatus "$DEVICE" -b
+xcrun simctl boot "$UDID" 2>/dev/null || true
+xcrun simctl bootstatus "$UDID" -b
 
 # 3. Install.
-xcrun simctl install "$DEVICE" \
+xcrun simctl install "$UDID" \
   "$DERIVED/Build/Products/Debug-iphonesimulator/Lightmeter.app"
 
 # 4. Launch under the harness.
-xcrun simctl terminate "$DEVICE" "$BUNDLE_ID" 2>/dev/null || true
-xcrun simctl launch "$DEVICE" "$BUNDLE_ID" \
+xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
+xcrun simctl launch "$UDID" "$BUNDLE_ID" \
   -design-harness -harness-scene blown-sky
 
 # 5. Screenshot, once the first reading has landed.
 sleep 3
-xcrun simctl io "$DEVICE" screenshot meter-blown-sky.png
+xcrun simctl io "$UDID" screenshot meter-blown-sky.png
 ```
 
 Steps 4–5 are the loop you repeat per scene — the build and install only need
@@ -80,17 +85,17 @@ redoing when the code changes:
 
 ```sh
 for scene in blown-sky dim-interior mixed-contrast; do
-  xcrun simctl terminate "$DEVICE" "$BUNDLE_ID" 2>/dev/null || true
-  xcrun simctl launch "$DEVICE" "$BUNDLE_ID" -design-harness -harness-scene "$scene"
+  xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
+  xcrun simctl launch "$UDID" "$BUNDLE_ID" -design-harness -harness-scene "$scene"
   sleep 3
-  xcrun simctl io "$DEVICE" screenshot "meter-$scene.png"
+  xcrun simctl io "$UDID" screenshot "meter-$scene.png"
 done
 ```
 
 To pin a specific reading rather than the scene's own light:
 
 ```sh
-xcrun simctl launch "$DEVICE" "$BUNDLE_ID" \
+xcrun simctl launch "$UDID" "$BUNDLE_ID" \
   -design-harness -harness-scene mixed-contrast -harness-ev 9.5
 ```
 

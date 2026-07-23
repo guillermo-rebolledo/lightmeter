@@ -11,6 +11,19 @@ import CoreGraphics
 /// what these tests pin.
 @MainActor
 struct ScriptedLightSourceTests {
+    /// Waits for `predicate` to hold, yielding to let the metering task run.
+    /// Fails as "never became true" rather than as a confusing downstream `nil`.
+    private func waitUntil(
+        _ predicate: () -> Bool,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) async {
+        for _ in 0..<10_000 {
+            if predicate() { return }
+            await Task.yield()
+        }
+        Issue.record("Condition never became true", sourceLocation: sourceLocation)
+    }
+
     @Test func authorizesWithoutTouchingTheCamera() async {
         let source = ScriptedLightSource(sceneEV: 15)
 
@@ -47,9 +60,7 @@ struct ScriptedLightSourceTests {
         let model = MeterViewModel(source: source)
 
         await model.start()
-        for _ in 0..<10_000 where model.ev == nil {
-            await Task.yield()
-        }
+        await waitUntil { model.ev != nil }
 
         #expect(model.status == .metering)
         #expect(abs((model.ev ?? .nan) - 12.5) < 0.0001)
@@ -65,14 +76,30 @@ struct ScriptedLightSourceTests {
         let model = MeterViewModel(source: source)
 
         await model.start()
-        for _ in 0..<10_000 where model.ev == nil {
-            await Task.yield()
-        }
+        await waitUntil { model.ev != nil }
         for _ in 0..<200 { await Task.yield() }
 
         #expect(model.status == .metering)
 
         model.stop()
+    }
+
+    /// The protocol says `stop()` finishes the stream returned by the matching
+    /// `start()`. The view-model relies on that to leave `.metering` cleanly
+    /// rather than on a cancelled loop noticing at its own pace.
+    @Test func stopFinishesTheStream() async {
+        let source = ScriptedLightSource(sceneEV: 15)
+        let stream = source.start()
+
+        var received = 0
+        source.stop()
+        for await _ in stream {
+            received += 1
+        }
+
+        // The loop above only exits because the stream finished; the count is
+        // whatever the first immediate yield left buffered.
+        #expect(received <= 1)
     }
 
     /// Spot metering has to remain drivable under the harness even though there

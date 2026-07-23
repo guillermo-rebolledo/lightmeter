@@ -218,10 +218,11 @@ struct ContentView: View {
     @ViewBuilder private var standInBackdrop: some View {
         #if DEBUG
         StandInSceneView(
-            scene: DesignHarness.configuration?.scene ?? .blownSky,
+            scene: DesignHarness.backdropScene,
             spot: model.spot,
             isSpotActive: model.pattern == .spot,
-            evReadout: evReadout
+            evReadout: evReadout,
+            onPlaceSpot: { model.placeSpot(at: $0) }
         )
         #else
         Color.black.ignoresSafeArea()
