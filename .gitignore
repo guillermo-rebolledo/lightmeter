@@ -12,3 +12,6 @@ xcuserdata/
 
 # macOS
 ._*
+
+# Claude
+.claude/worktrees/*
