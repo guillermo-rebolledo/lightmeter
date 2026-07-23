@@ -3,14 +3,16 @@ import SwiftUI
 /// The exposure triangle as three value chips — ISO, aperture, shutter — floated
 /// over the preview. The solved leg (shutter in aperture-priority) is tinted and
 /// marked non-editable; the two set legs read as plain values and can be tapped
-/// to bind the ruler dial. The chip the dial is bound to is highlighted. Values
-/// animate as the light changes.
+/// to move the ruler dial to them. Exactly one editable chip is highlighted as
+/// bound — the dial is always bound to a leg, so this is never empty — except
+/// while the transient compensation overlay owns the dial. Values animate as the
+/// light changes.
 struct ExposureChipsView: View {
     let triangle: ExposureTriangle
-    /// Which leg the ruler dial is currently bound to, or `nil` when no dial is
-    /// active — the chip to highlight as selected.
+    /// Which leg the ruler dial is currently bound to, or `nil` while the
+    /// compensation overlay owns the dial — the chip to highlight as selected.
     let boundComponent: ExposureComponent?
-    /// Called when an editable chip is tapped, to bind (or unbind) the dial.
+    /// Called when an editable chip is tapped, to move the ruler dial to that leg.
     let onSelect: (ExposureComponent) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

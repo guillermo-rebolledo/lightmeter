@@ -8,7 +8,7 @@ struct MeterViewModelState: Equatable {
     let aperture: Double
     let shutter: Double
     let compensation: Double
-    let dialTarget: DialTarget?
+    let dialTarget: DialTarget
     let pattern: MeteringPattern
     let spot: CGPoint?
 }

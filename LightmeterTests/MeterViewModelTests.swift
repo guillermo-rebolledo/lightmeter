@@ -316,6 +316,31 @@ struct MeterViewModelTests {
         #expect(vm.compensationLabel == "+1.0 EV")
     }
 
+    /// EV compensation borrows the dial as a transient overlay; dismissing it
+    /// returns the dial home to the priority leg rather than emptying it.
+    @Test func dismissingCompensationReturnsTheDialHomeToThePriorityLeg() {
+        let vm = MeterViewModel(source: FakeLightSource())
+
+        vm.bindCompensationDial()
+        #expect(vm.isCompensationDialBound)
+        #expect(vm.boundComponent == nil)
+
+        vm.bindCompensationDial() // dismiss the overlay
+        #expect(vm.isCompensationDialBound == false)
+        #expect(vm.boundComponent == .aperture)
+    }
+
+    /// In shutter-priority the dial's home is the shutter, so dismissing
+    /// compensation there returns to the shutter, not the aperture.
+    @Test func dismissingCompensationReturnsHomeInShutterPriority() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        vm.setMode(.shutterPriority)
+
+        vm.bindCompensationDial()
+        vm.bindCompensationDial()
+        #expect(vm.boundComponent == .shutter)
+    }
+
     /// The public setter cannot move compensation beyond the dial's ±3 EV ends.
     @Test func compensationClampsToTheDialBounds() {
         let vm = MeterViewModel(source: FakeLightSource())
@@ -329,48 +354,48 @@ struct MeterViewModelTests {
 
     // MARK: - Dial binding
 
-    /// Tapping a chip binds the dial to that leg; nothing is bound to start.
-    @Test func bindingTheDialSelectsAnEditableLeg() {
+    /// The dial is never empty: it opens already bound to the priority leg —
+    /// aperture in the default aperture-priority — so the drawer never shows an
+    /// empty/invisible dial state.
+    @Test func theDialOpensBoundToThePriorityLeg() {
         let vm = MeterViewModel(source: FakeLightSource())
-        #expect(vm.boundComponent == nil)
-
-        vm.bindDial(to: .aperture)
         #expect(vm.boundComponent == .aperture)
     }
 
-    /// Only one leg is ever bound — binding a new leg replaces the old one.
-    @Test func bindingAnotherLegReplacesTheCurrentOne() {
+    /// Tapping the other editable leg (ISO) moves the dial binding to it.
+    @Test func bindingAnotherLegMovesTheDialToIt() {
         let vm = MeterViewModel(source: FakeLightSource())
-        vm.bindDial(to: .aperture)
         vm.bindDial(to: .iso)
         #expect(vm.boundComponent == .iso)
     }
 
-    /// Tapping the already-bound chip toggles the dial off.
-    @Test func bindingTheBoundLegAgainUnbinds() {
+    /// Re-tapping the already-bound chip leaves the dial bound and visible — the
+    /// accidental toggle-off is gone.
+    @Test func bindingTheBoundLegAgainKeepsItBound() {
         let vm = MeterViewModel(source: FakeLightSource())
-        vm.bindDial(to: .aperture)
-        vm.bindDial(to: .aperture)
-        #expect(vm.boundComponent == nil)
+        vm.bindDial(to: .iso)
+        vm.bindDial(to: .iso)
+        #expect(vm.boundComponent == .iso)
     }
 
-    /// The solved (non-editable) leg can't be bound — there's nothing to dial.
-    @Test func theSolvedLegCannotBeBound() {
+    /// The solved (non-editable) leg can't be bound — the dial stays on the leg it
+    /// already tracks rather than emptying.
+    @Test func bindingTheSolvedLegIsIgnored() {
         let vm = MeterViewModel(source: FakeLightSource())
         vm.bindDial(to: .shutter) // shutter is solved in aperture-priority
-        #expect(vm.boundComponent == nil)
+        #expect(vm.boundComponent == .aperture)
     }
 
     /// The bound stops and the current index describe the bound leg's scale and
-    /// where its value sits on it (aperture f/8 is index 18 on the f-scale).
+    /// where its value sits on it. The dial opens on the aperture priority leg,
+    /// whose f/8 default is index 18 on the f-scale.
     @Test func boundStopsAndIndexTrackTheBoundLeg() {
         let vm = MeterViewModel(source: FakeLightSource())
-        #expect(vm.boundStops.isEmpty)
-        #expect(vm.boundStopIndex == nil)
-
-        vm.bindDial(to: .aperture)
         #expect(vm.boundStops == PhotographicScale.aperture.stops)
         #expect(vm.boundStops[vm.boundStopIndex!].label == "8")
+
+        vm.bindDial(to: .iso)
+        #expect(vm.boundStops == PhotographicScale.iso.stops)
     }
 
     /// Driving the dial to a new stop sets the bound leg and re-solves the
@@ -453,24 +478,27 @@ struct MeterViewModelTests {
         #expect(vm.mode == .aperturePriority)
     }
 
-    /// Switching modes unbinds the dial if it was bound to the leg that becomes
-    /// solved (and so non-editable) — the dial must never drive a computed leg.
-    @Test func switchingModeUnbindsTheDialFromANowSolvedLeg() {
+    /// Switching modes re-binds the dial to the new priority leg — never emptying
+    /// it and never leaving it on a now-solved leg. Aperture-priority binds the
+    /// aperture; switching to shutter-priority moves the dial to the shutter.
+    @Test func switchingModeRebindsTheDialToTheNewPriorityLeg() {
         let vm = MeterViewModel(source: FakeLightSource())
-        vm.bindDial(to: .aperture)
         #expect(vm.boundComponent == .aperture)
 
-        // Shutter-priority solves the aperture, so the aperture dial must unbind.
         vm.setMode(.shutterPriority)
-        #expect(vm.boundComponent == nil)
+        #expect(vm.boundComponent == .shutter)
+
+        vm.setMode(.aperturePriority)
+        #expect(vm.boundComponent == .aperture)
     }
 
-    /// A dial bound to a leg that stays editable across the switch is left alone.
-    @Test func switchingModeKeepsADialBoundToAStillEditableLeg() {
+    /// Switching modes re-binds to the new priority leg even when the dial was on
+    /// ISO (which stays editable across the switch): the priority leg is home.
+    @Test func switchingModeRebindsAwayFromISO() {
         let vm = MeterViewModel(source: FakeLightSource())
-        vm.bindDial(to: .iso) // ISO is a set input in both modes
+        vm.bindDial(to: .iso)
         vm.setMode(.shutterPriority)
-        #expect(vm.boundComponent == .iso)
+        #expect(vm.boundComponent == .shutter)
     }
 
     // MARK: - Metering pattern
