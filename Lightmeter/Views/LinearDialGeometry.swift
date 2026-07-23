@@ -2,13 +2,14 @@ import CoreGraphics
 
 /// The pure geometry behind the linear ruler dial: it maps a drag to a continuous
 /// dial position, rounds that to a real stop, and places evenly spaced ticks along
-/// the ruler's main axis. No SwiftUI, gestures, or haptics — just the risky math,
-/// so it can be unit-tested in isolation.
+/// the ruler. No SwiftUI, gestures, or haptics — just the risky math, so it can be
+/// unit-tested in isolation. Axis-agnostic (the dial is horizontal-only now, but
+/// this is plain 1-D stop math with no orientation baked in).
 ///
 /// Positions are expressed in stop-units: `0` is the first stop, `stopCount - 1`
-/// the last. Offsets are measured along the ruler's main axis (x when the ruler is
-/// horizontal, y when vertical) from the fixed indicator at its centre; positive
-/// offsets point toward higher-value stops (right / down).
+/// the last. Offsets are measured along the ruler (x, since it is horizontal) from
+/// the fixed indicator at its centre; positive offsets point toward higher-value
+/// stops (right).
 struct LinearDialGeometry {
     /// The distance (points) along the main axis of one stop: both the drag travel
     /// that advances the selection one stop and the gap between adjacent ticks. A

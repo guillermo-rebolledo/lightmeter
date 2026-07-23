@@ -1,15 +1,16 @@
 import SwiftUI
 import UIKit
 
-/// A compact linear ruler dial: the scale's stops lie along a straight ruler and
-/// sweep past a fixed indicator as you drag. Each stop that crosses the indicator
-/// fires a selection haptic — the detent tick that makes the dial feel mechanical.
-/// Snapping is stop-to-stop; the ruler always settles on a real, dial-able mark.
+/// A compact horizontal linear ruler dial: the scale's stops lie along a straight
+/// ruler and sweep past a fixed indicator as you drag. Each stop that crosses the
+/// indicator fires a selection haptic — the detent tick that makes the dial feel
+/// mechanical. Snapping is stop-to-stop; the ruler always settles on a real,
+/// dial-able mark.
 ///
-/// The dial works along either `axis`. Horizontally it hugs the bottom edge and
-/// sweeps left/right (portrait); vertically it hugs the trailing edge and sweeps
-/// up/down (landscape). The view is axis-generic — the vertical layout is the
-/// horizontal one turned a quarter-turn, reading the matching translation axis.
+/// The dial hugs the bottom of the HUD content and sweeps left/right; it is folded
+/// under the chips in both orientations. (An earlier axis-generic variant also ran
+/// vertically along the landscape trailing edge; that slot is gone, so the view is
+/// horizontal-only.)
 ///
 /// The dial is a pure controller: `selectedIndex` and `labels` are the source of
 /// truth (owned by `MeterViewModel`), and `onSelect` reports each new detent up.
@@ -17,9 +18,8 @@ import UIKit
 /// so the same gesture drives both the visual sweep and the reported value. All
 /// tick-placement and drag→stop math lives in `LinearDialGeometry`.
 struct LinearDialView: View {
-    /// The thickness the dial requires across its short axis, including ticks, the
-    /// centred label, and gesture area — a height when horizontal, a width when
-    /// vertical. Far slimmer than the old arc, reclaiming frame for the preview.
+    /// The height the dial requires, including ticks, the centred label, and
+    /// gesture area — far slimmer than the old arc, reclaiming frame for the preview.
     static let layoutThickness: CGFloat = 64
 
     /// The detent labels laid out along the ruler.
@@ -28,8 +28,6 @@ struct LinearDialView: View {
     let selectedIndex: Int?
     /// The leg being dialed, e.g. `"Aperture"` — announced to VoiceOver when bound.
     let caption: String?
-    /// The edge the dial hugs and the direction it sweeps. Defaults to horizontal.
-    var axis: Axis = .horizontal
     /// Reports a newly selected stop index (already clamped to `stops`).
     let onSelect: (Int) -> Void
 
@@ -95,10 +93,7 @@ struct LinearDialView: View {
                 .opacity(isBound ? 1 : 0)
                 .position(indicatorPosition(in: geo.size))
         }
-        .frame(
-            width: axis == .vertical ? Self.layoutThickness : nil,
-            height: axis == .horizontal ? Self.layoutThickness : nil
-        )
+        .frame(height: Self.layoutThickness)
         .contentShape(Rectangle())
         .gesture(dialGesture)
         .accessibilityElement()
@@ -117,37 +112,28 @@ struct LinearDialView: View {
 
     // MARK: - Geometry
 
-    /// The centre of the ruler along its main axis: the width's midpoint when
-    /// horizontal, the height's when vertical. Ticks are placed relative to it.
+    /// The horizontal centre of the ruler: the width's midpoint. Ticks are placed
+    /// relative to it.
     private func mainAxisCenter(in size: CGSize) -> CGFloat {
-        axis == .horizontal ? size.width / 2 : size.height / 2
+        size.width / 2
     }
 
     /// Where a tick sits, given its signed `offset` from the fixed indicator along
-    /// the main axis. The cross-axis position is fixed at `tickInset` from the edge.
+    /// the ruler. The vertical position is fixed at `tickInset` from the bottom edge.
     private func tickPosition(offset: CGFloat, in size: CGSize) -> CGPoint {
-        switch axis {
-        case .horizontal: CGPoint(x: mainAxisCenter(in: size) + offset, y: tickInset)
-        case .vertical: CGPoint(x: size.width - tickInset, y: mainAxisCenter(in: size) + offset)
-        }
+        CGPoint(x: mainAxisCenter(in: size) + offset, y: tickInset)
     }
 
-    /// The centred selected value's anchor, near the hugged edge and lined up with
-    /// the fixed indicator along the main axis.
+    /// The centred selected value's anchor, near the bottom edge and lined up with
+    /// the fixed indicator.
     private func labelPosition(in size: CGSize) -> CGPoint {
-        switch axis {
-        case .horizontal: CGPoint(x: mainAxisCenter(in: size), y: labelInset)
-        case .vertical: CGPoint(x: size.width - labelInset, y: mainAxisCenter(in: size))
-        }
+        CGPoint(x: mainAxisCenter(in: size), y: labelInset)
     }
 
     /// The fixed indicator's anchor: between the label and the tick row, at the
-    /// ruler's centre, so its caret points inward at the selected tick.
+    /// ruler's centre, so its caret points down at the selected tick.
     private func indicatorPosition(in size: CGSize) -> CGPoint {
-        switch axis {
-        case .horizontal: CGPoint(x: mainAxisCenter(in: size), y: indicatorInset)
-        case .vertical: CGPoint(x: size.width - indicatorInset, y: mainAxisCenter(in: size))
-        }
+        CGPoint(x: mainAxisCenter(in: size), y: indicatorInset)
     }
 
     // MARK: - Marks
@@ -161,8 +147,8 @@ struct LinearDialView: View {
 
         return Capsule()
             .frame(
-                width: axis == .horizontal ? (isSelected ? 2 : 1) : (isSelected ? 16 : 10),
-                height: axis == .horizontal ? (isSelected ? 16 : 10) : (isSelected ? 2 : 1)
+                width: isSelected ? 2 : 1,
+                height: isSelected ? 16 : 10
             )
             .foregroundStyle(isSelected
                 ? AnyShapeStyle(.tint)
@@ -184,14 +170,14 @@ struct LinearDialView: View {
     /// The fixed indicator the values sweep past — a caret pinned over the tick row,
     /// pointing at the selected mark.
     private var indicator: some View {
-        Image(systemName: axis == .horizontal ? "arrowtriangle.down.fill" : "arrowtriangle.left.fill")
+        Image(systemName: "arrowtriangle.down.fill")
             .font(.system(size: 11))
             .foregroundStyle(.tint)
             .accessibilityHidden(true)
     }
 
     /// Softens the ends of the ruler so ticks fade out rather than clip at a hard
-    /// edge, along whichever axis the dial sweeps.
+    /// edge as they sweep left/right.
     private var edgeFade: some View {
         LinearGradient(
             stops: [
@@ -200,8 +186,8 @@ struct LinearDialView: View {
                 .init(color: .black, location: 0.86),
                 .init(color: .clear, location: 1),
             ],
-            startPoint: axis == .horizontal ? .leading : .top,
-            endPoint: axis == .horizontal ? .trailing : .bottom
+            startPoint: .leading,
+            endPoint: .trailing
         )
     }
 
@@ -221,9 +207,9 @@ struct LinearDialView: View {
                     haptics.prepare()
                 }
 
-                // Dragging back along the axis (left / up) advances toward higher
-                // values; one `pointsPerStop` of travel is one stop.
-                let travel = axis == .horizontal ? value.translation.width : value.translation.height
+                // Dragging back (left) advances toward higher values; one
+                // `pointsPerStop` of travel is one stop.
+                let travel = value.translation.width
                 let clamped = geometry.position(fromAnchor: dragAnchorIndex, travel: travel, stopCount: labels.count)
                 dragPosition = clamped
 
@@ -279,30 +265,6 @@ private extension Array {
                         labels: PhotographicScale.aperture.stops.map(\.label),
                         selectedIndex: index,
                         caption: "Aperture",
-                        onSelect: { index = $0 }
-                    )
-                }
-            }
-            .tint(.yellow)
-            .preferredColorScheme(.dark)
-        }
-    }
-    return DialPreview()
-}
-
-#Preview("Vertical") {
-    struct DialPreview: View {
-        @State private var index = 18 // f/8 on the aperture scale
-        var body: some View {
-            ZStack {
-                Color.black.ignoresSafeArea()
-                HStack {
-                    Spacer()
-                    LinearDialView(
-                        labels: PhotographicScale.aperture.stops.map(\.label),
-                        selectedIndex: index,
-                        caption: "Aperture",
-                        axis: .vertical,
                         onSelect: { index = $0 }
                     )
                 }

@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The permanent slot for the linear ruler dial.
+/// The permanent slot for the horizontal linear ruler dial, folded into the HUD
+/// content below the chips in both orientations.
 ///
 /// The dial stays mounted so its gesture area is available before a target is
 /// bound; only its visual content changes visibility. A shared meter control:
@@ -8,16 +9,12 @@ import SwiftUI
 /// orientation changes.
 struct MeterDialHost: View {
     let model: MeterViewModel
-    /// The edge the dial hugs: horizontal (bottom) in portrait, vertical
-    /// (trailing) in landscape. The same shared instance sweeps either axis.
-    var axis: Axis = .horizontal
 
     var body: some View {
         LinearDialView(
             labels: model.dialLabels,
             selectedIndex: model.dialStopIndex,
             caption: model.dialCaption,
-            axis: axis,
             onSelect: { model.setDialStopIndex($0) }
         )
         .guidedTourAnchor(.dial)

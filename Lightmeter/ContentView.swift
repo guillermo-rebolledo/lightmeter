@@ -75,9 +75,10 @@ struct ContentView: View {
                 .tint(.yellow)
                 .guidedTourAnchor(.settings)
                 .padding(.top, 4)
-                // In landscape the vertical dial hugs the trailing edge; inset
-                // the gear past its thickness so the two never overlap.
-                .padding(.trailing, isLandscape ? LinearDialView.layoutThickness + 8 : 8)
+                // In landscape the HUD drawer hugs the trailing edge; inset the
+                // gear past the drawer's width so it stays over the preview and
+                // never disappears beneath the drawer.
+                .padding(.trailing, isLandscape ? LandscapeMeterLayout.drawerWidth + 8 : 8)
             }
             // Resolve tour anchors in the same full-screen space the spotlight
             // draws into. An outer overlay under-reports Y by the top safe area,
@@ -151,8 +152,8 @@ struct ContentView: View {
     /// compose the same shared control views (with stable tour anchors) over the
     /// preview, so rotating reflows the controls without tearing down the camera.
     /// The reflow rides a single `verticalSizeClass`-keyed implicit animation —
-    /// pills glide to their new homes and the dial cross-fades across the axis
-    /// flip — collapsing to a plain swap under Reduce Motion.
+    /// the drawer slides from the bottom edge to the trailing edge and its controls
+    /// glide to their new homes — collapsing to a plain swap under Reduce Motion.
     @ViewBuilder private var meterLayout: some View {
         let advisories = tourAdvisories ?? model.advisories
 

@@ -94,11 +94,55 @@ struct GlassChipBackground: ViewModifier {
     }
 }
 
-/// The compact HUD card surface. iOS 26: clear Liquid Glass in the card's rounded
-/// rectangle. Pre-26: the dialled-back `.ultraThinMaterial` that lets more of the
-/// preview show through.
+/// Which screen edge the HUD drawer docks to. Sets the two-corner rounded shape
+/// (the inner corners are rounded, the ones on the screen edge are square), the
+/// safe areas the surface bleeds past, and the stretch axis.
+enum DrawerEdge {
+    /// Portrait: the drawer rises from the bottom, full-width, its top two corners
+    /// rounded; the surface bleeds down behind the home indicator.
+    case bottom
+    /// Landscape: the drawer slides in from the trailing edge, full-height, its two
+    /// leading (inner) corners rounded; the surface bleeds out to the physical edge.
+    case trailing
+}
+
+extension View {
+    /// Docks the receiver as the HUD drawer against `edge`: stretches it along the
+    /// screen edge, lays the two-corner `GlassCardBackground` surface behind it (which
+    /// bleeds to the physical edge while the content stays inside the safe area), and
+    /// groups its glass — the surface and every glass control it holds (freeze, the
+    /// strip buttons, the chips) — into one `GlassEffectContainer` via `glassGroup()`
+    /// so adjacent glass blends as a single system; on the pre-26 fallback that
+    /// grouping is a passthrough. Shared by both layouts so the docking recipe lives
+    /// in one place even though the stretch axis differs per edge.
+    func docked(edge: DrawerEdge) -> some View {
+        drawerStretch(edge: edge)
+            .modifier(GlassCardBackground(edge: edge))
+            .glassGroup()
+    }
+
+    /// Stretches the drawer along the screen edge it docks to: full-width at the
+    /// bottom, full-height (content top-aligned) at the trailing edge. The
+    /// cross-axis extent is left to the content (its natural height in portrait, a
+    /// fixed width set by the layout in landscape).
+    @ViewBuilder
+    private func drawerStretch(edge: DrawerEdge) -> some View {
+        switch edge {
+        case .bottom: frame(maxWidth: .infinity)
+        case .trailing: frame(maxHeight: .infinity, alignment: .top)
+        }
+    }
+}
+
+/// The docked HUD drawer surface. iOS 26: clear Liquid Glass in the drawer's
+/// two-corner rounded shape. Pre-26: the dialled-back `.ultraThinMaterial` that
+/// lets more of the preview show through. The surface bleeds all the way to the
+/// physical screen edge (behind the home indicator in portrait, out past the
+/// trailing safe area in landscape) via `ignoresSafeArea`, while the drawer content
+/// stays inside the safe area so it never collides with the home indicator, notch,
+/// or Dynamic Island.
 ///
-/// A darkening scrim sits *behind the card content but in front of the glass /
+/// A darkening scrim sits *behind the drawer content but in front of the glass /
 /// material* on both paths, so the white / `.secondary` / `.yellow` HUD text keeps
 /// its contrast even over a blown-out sky where the translucent surface alone would
 /// wash out. It is gated the same way the glass is: a light scrim under iOS 26
@@ -107,29 +151,64 @@ struct GlassChipBackground: ViewModifier {
 /// stable dark surface. Both branches stay complete and intentional per the
 /// standing fallback rule.
 struct GlassCardBackground: ViewModifier {
+    /// The edge the drawer docks to — its two inner corners are rounded, the two on
+    /// the screen edge are square.
+    let edge: DrawerEdge
+
+    /// The inner corner radius, applied to the two corners that face the content.
+    private static let cornerRadius: CGFloat = 24
     /// Tuned to hold text legibility over bright scenes without flattening the
     /// glass's refraction; the fallback leans darker since its material carries
     /// less depth of its own.
     private static let glassScrimOpacity = 0.16
     private static let fallbackScrimOpacity = 0.32
 
-    private var shape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 24, style: .continuous)
+    /// The two-corner shape: the inner corners rounded at 24pt, the edge corners
+    /// square, so the surface can sit flush against the screen edge.
+    private var shape: UnevenRoundedRectangle {
+        let r = Self.cornerRadius
+        switch edge {
+        case .bottom:
+            // Top two corners rounded (the drawer rises from the bottom).
+            return UnevenRoundedRectangle(
+                topLeadingRadius: r, bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0, topTrailingRadius: r,
+                style: .continuous
+            )
+        case .trailing:
+            // The two leading corners rounded (the drawer enters from the right).
+            return UnevenRoundedRectangle(
+                topLeadingRadius: r, bottomLeadingRadius: r,
+                bottomTrailingRadius: 0, topTrailingRadius: 0,
+                style: .continuous
+            )
+        }
+    }
+
+    /// The safe areas the surface bleeds past to reach the physical screen edges —
+    /// only the edges the drawer is docked against, so the rounded inner corners
+    /// stay anchored at the content boundary.
+    private var bleedEdges: Edge.Set {
+        switch edge {
+        case .bottom: [.bottom]
+        case .trailing: [.trailing, .top, .bottom]
+        }
     }
 
     func body(content: Content) -> some View {
+        content.background { surface.ignoresSafeArea(edges: bleedEdges) }
+    }
+
+    /// The scrim-over-surface stack, drawn behind the content so the order
+    /// front-to-back is content → scrim → glass / material.
+    @ViewBuilder private var surface: some View {
         if #available(iOS 26, *) {
-            content
-                // Scrim behind the content, above the glass: `.background` layers
-                // it under the content, and `.glassEffect` then renders beneath
-                // that — so the order front-to-back is content → scrim → glass.
-                .background { shape.fill(.black.opacity(Self.glassScrimOpacity)) }
+            shape
+                .fill(.black.opacity(Self.glassScrimOpacity))
                 .glassEffect(.regular, in: shape)
         } else {
-            content.background {
-                shape.fill(.ultraThinMaterial).opacity(0.82)
-                    .overlay { shape.fill(.black.opacity(Self.fallbackScrimOpacity)) }
-            }
+            shape.fill(.ultraThinMaterial).opacity(0.82)
+                .overlay { shape.fill(.black.opacity(Self.fallbackScrimOpacity)) }
         }
     }
 }

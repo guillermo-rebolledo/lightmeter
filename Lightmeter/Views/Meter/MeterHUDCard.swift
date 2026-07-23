@@ -1,22 +1,23 @@
 import SwiftUI
 
-/// The compact, thinner, more-transparent metering card shared by both
-/// orientations: a demoted freeze icon beside a smaller EV readout, a thin
-/// advisory line, the inline expanding control strip (compensation, pattern,
-/// priority), and the exposure-triangle chips — all folded into one small
-/// `.ultraThinMaterial` surface so the HUD reads as a single unit.
+/// The metering HUD's content column, shared by both orientations: a demoted
+/// freeze icon beside a smaller EV readout, a thin advisory line, the inline
+/// expanding control strip (compensation, pattern, priority), the exposure-triangle
+/// chips, and — folded in below them in *both* orientations now — the horizontal
+/// ruler dial.
 ///
-/// Composing the *same* card in portrait and landscape is what keeps the two
+/// Composing the *same* column in portrait and landscape is what keeps the two
 /// orientations at parity and lets tour anchors survive rotation: every anchor
-/// (`.evReadout`, `.priorityAndChips`, and the strip's `.compensation` /
-/// `.meteringPattern`) lives on a shared control here, so rotating reflows the
-/// card without tearing down the camera or re-wiring the guided tour.
+/// (`.evReadout`, `.priorityAndChips`, the strip's `.compensation` /
+/// `.meteringPattern`, and the dial's `.dial`) lives on a shared control here, so
+/// rotating reflows the column without tearing down the camera or re-wiring the
+/// guided tour.
 ///
-/// Portrait folds the ruler dial in below the chips (`foldsInDial: true`);
-/// landscape runs the dial vertically along the trailing edge instead, mounting
-/// its own `MeterDialHost` outside the card (`foldsInDial: false`). Positioning —
-/// hugging the bottom in portrait, a fixed-width leading column in landscape —
-/// stays with each layout; only the card's chrome and content live here.
+/// This view is only the padded content. The docking chrome — the two-corner
+/// `GlassCardBackground` surface that bleeds to the screen edge, the stretch frame,
+/// and the `glassGroup()` wrapper — is applied by each layout via the shared
+/// `docked(edge:)` helper, which the surface stretches differently per edge
+/// (content-height at the bottom, full-height at the trailing edge).
 struct MeterHUDCard: View {
     let model: MeterViewModel
     /// The advisories snapshot to display — frozen while the tour runs.
@@ -25,9 +26,6 @@ struct MeterHUDCard: View {
     /// The guided tour's current step, forwarded to the control strip so it can
     /// force-open the section the active step targets (and its anchor resolves).
     var tourStep: GuidedTourStep?
-    /// Whether the ruler dial folds into the card below the chips (portrait) or
-    /// is mounted separately on the trailing edge (landscape).
-    let foldsInDial: Bool
 
     var body: some View {
         VStack(spacing: 12) {
@@ -49,25 +47,43 @@ struct MeterHUDCard: View {
                         onToggle: model.toggleFreeze
                     )
                 }
+                .id(GuidedTourStep.evReadout)
             MeterAdvisories(advisories: advisories, isTourActive: isTourActive, isCompact: true)
             MeterControlStrip(model: model, tourStep: tourStep)
+                // Holds both the `.compensation` and `.meteringPattern` anchors.
+                .id(GuidedTourStep.meteringPattern)
             ExposureChipsView(
                 triangle: model.triangle,
                 boundComponent: model.boundComponent,
                 onSelect: { model.bindDial(to: $0) }
             )
             .guidedTourAnchor(.priorityAndChips)
-            if foldsInDial {
-                MeterDialHost(model: model)
-            }
+            .id(GuidedTourStep.priorityAndChips)
+            // The ruler dial is always horizontal now, folded under the chips in
+            // both orientations; the separate vertical-dial slot landscape used to
+            // mount on its trailing edge is gone.
+            MeterDialHost(model: model)
+                .id(GuidedTourStep.dial)
         }
         .padding(14)
-        // Liquid Glass on iOS 26, the dialed-back `.ultraThinMaterial` on the
-        // iOS 17/18 floor (see `GlassCardBackground`). The card and every glass
-        // control it holds — freeze, the strip buttons, the chips — share one
-        // `GlassEffectContainer` via `glassGroup()` so adjacent glass blends as a
-        // single system; on the fallback that grouping is a passthrough.
-        .modifier(GlassCardBackground())
-        .glassGroup()
+    }
+}
+
+extension MeterHUDCard {
+    /// The scroll-target `id` for the row holding `step`'s tour anchor — the stable
+    /// `.id(...)` values pinned on the rows above. When the landscape drawer is tall
+    /// enough to scroll (short heights, large Dynamic Type), `LandscapeMeterLayout`
+    /// scrolls to this id so the active guided-tour control is revealed rather than
+    /// left off-screen under a stranded spotlight. `nil` for `.settings`, whose gear
+    /// lives outside the drawer. Rows carry the same id in portrait, where there is
+    /// no scroll container, so it is an inert view identity there.
+    static func scrollTarget(for step: GuidedTourStep) -> GuidedTourStep? {
+        switch step {
+        case .evReadout: .evReadout
+        case .meteringPattern, .compensation: .meteringPattern
+        case .priorityAndChips: .priorityAndChips
+        case .dial: .dial
+        case .settings: nil
+        }
     }
 }
