@@ -27,6 +27,16 @@ Release and leaves behaviour exactly as it was.
 A mistyped value falls back rather than failing to launch, so a typo still gives
 a running screen to look at.
 
+## The reference shots
+
+Today's meter screen under the harness, at the commit that introduced it —
+the baseline any variant is compared against. Regenerate them with the
+sequence below whenever the meter screen changes deliberately.
+
+| `blown-sky` | `dim-interior` | `mixed-contrast` |
+| --- | --- | --- |
+| ![Blown sky](design-harness/meter-blown-sky.png) | ![Dim interior](design-harness/meter-dim-interior.png) | ![Mixed contrast](design-harness/meter-mixed-contrast.png) |
+
 ### The scenes
 
 | Scene | Nominal EV | What it is for |
