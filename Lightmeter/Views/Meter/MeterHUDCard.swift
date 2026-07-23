@@ -1,17 +1,19 @@
 import SwiftUI
 
 /// The metering HUD's content column, shared by both orientations: the freeze
-/// padlock beside the solved-leg hero, a thin advisory line, the inline
-/// expanding control strip (compensation, pattern, priority), the exposure-triangle
+/// padlock beside the solved-leg hero, a thin advisory line, the exposure-triangle
 /// chips, and — folded in below them in *both* orientations now — the horizontal
 /// ruler dial.
 ///
+/// The occasional controls (metering pattern, compensation) are *not* here: they
+/// live over the preview as `MeterStatusPills` in the top-left, which is what
+/// clears the card down to the readout, the chips, and the dial.
+///
 /// Composing the *same* column in portrait and landscape is what keeps the two
-/// orientations at parity and lets tour anchors survive rotation: every anchor
-/// (`.evReadout`, `.priorityAndChips`, the strip's `.compensation` /
-/// `.meteringPattern`, and the dial's `.dial`) lives on a shared control here, so
-/// rotating reflows the column without tearing down the camera or re-wiring the
-/// guided tour.
+/// orientations at parity and lets tour anchors survive rotation: every anchor the
+/// card owns (`.evReadout`, `.priorityAndChips`, and the dial's `.dial`) lives on
+/// a shared control here, so rotating reflows the column without tearing down the
+/// camera or re-wiring the guided tour.
 ///
 /// This view is only the padded content. The docking chrome — the two-corner
 /// `GlassCardBackground` surface that bleeds to the screen edge, the stretch frame,
@@ -23,9 +25,6 @@ struct MeterHUDCard: View {
     /// The advisories snapshot to display — frozen while the tour runs.
     let advisories: [ExposureAdvisory]
     let isTourActive: Bool
-    /// The guided tour's current step, forwarded to the control strip so it can
-    /// force-open the section the active step targets (and its anchor resolves).
-    var tourStep: GuidedTourStep?
 
     var body: some View {
         VStack(spacing: 12) {
@@ -48,9 +47,6 @@ struct MeterHUDCard: View {
                 }
                 .id(GuidedTourStep.evReadout)
             MeterAdvisories(advisories: advisories, isTourActive: isTourActive, isCompact: true)
-            MeterControlStrip(model: model, tourStep: tourStep)
-                // Holds both the `.compensation` and `.meteringPattern` anchors.
-                .id(GuidedTourStep.meteringPattern)
             ExposureChipsView(
                 triangle: model.triangle,
                 boundComponent: model.boundComponent,
@@ -73,16 +69,17 @@ extension MeterHUDCard {
     /// `.id(...)` values pinned on the rows above. When the landscape drawer is tall
     /// enough to scroll (short heights, large Dynamic Type), `LandscapeMeterLayout`
     /// scrolls to this id so the active guided-tour control is revealed rather than
-    /// left off-screen under a stranded spotlight. `nil` for `.settings`, whose gear
-    /// lives outside the drawer. Rows carry the same id in portrait, where there is
-    /// no scroll container, so it is an inert view identity there.
+    /// left off-screen under a stranded spotlight. `nil` for the steps whose control
+    /// lives outside the drawer — the settings gear and, since they moved to the
+    /// top-left status pills, metering pattern and compensation. Rows carry the same
+    /// id in portrait, where there is no scroll container, so it is an inert view
+    /// identity there.
     static func scrollTarget(for step: GuidedTourStep) -> GuidedTourStep? {
         switch step {
         case .welcome, .evReadout: .evReadout
-        case .meteringPattern, .compensation: .meteringPattern
         case .priorityAndChips: .priorityAndChips
         case .dial: .dial
-        case .settings: nil
+        case .meteringPattern, .compensation, .settings: nil
         }
     }
 }

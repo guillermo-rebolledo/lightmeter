@@ -14,9 +14,6 @@ struct PortraitMeterLayout: View {
     /// The advisories snapshot to display — frozen while the tour runs.
     let advisories: [ExposureAdvisory]
     let isTourActive: Bool
-    /// The guided tour's current step, forwarded to the shared card's control
-    /// strip so it can force-open the section the active step targets.
-    var tourStep: GuidedTourStep?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,8 +21,7 @@ struct PortraitMeterLayout: View {
             MeterHUDCard(
                 model: model,
                 advisories: advisories,
-                isTourActive: isTourActive,
-                tourStep: tourStep
+                isTourActive: isTourActive
             )
             // Full-width drawer flush to the bottom safe area; the two-corner
             // surface (glass on iOS 26, material + scrim on the floor) bleeds
