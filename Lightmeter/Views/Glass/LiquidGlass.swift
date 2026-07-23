@@ -97,17 +97,38 @@ struct GlassChipBackground: ViewModifier {
 /// The compact HUD card surface. iOS 26: clear Liquid Glass in the card's rounded
 /// rectangle. Pre-26: the dialled-back `.ultraThinMaterial` that lets more of the
 /// preview show through.
+///
+/// A darkening scrim sits *behind the card content but in front of the glass /
+/// material* on both paths, so the white / `.secondary` / `.yellow` HUD text keeps
+/// its contrast even over a blown-out sky where the translucent surface alone would
+/// wash out. It is gated the same way the glass is: a light scrim under iOS 26
+/// Liquid Glass — enough to guarantee legibility while preserving the refracting
+/// look — and a denser scrim on the `.ultraThinMaterial` fallback so it reads as a
+/// stable dark surface. Both branches stay complete and intentional per the
+/// standing fallback rule.
 struct GlassCardBackground: ViewModifier {
+    /// Tuned to hold text legibility over bright scenes without flattening the
+    /// glass's refraction; the fallback leans darker since its material carries
+    /// less depth of its own.
+    private static let glassScrimOpacity = 0.16
+    private static let fallbackScrimOpacity = 0.32
+
     private var shape: RoundedRectangle {
         RoundedRectangle(cornerRadius: 24, style: .continuous)
     }
 
     func body(content: Content) -> some View {
         if #available(iOS 26, *) {
-            content.glassEffect(.regular, in: shape)
+            content
+                // Scrim behind the content, above the glass: `.background` layers
+                // it under the content, and `.glassEffect` then renders beneath
+                // that — so the order front-to-back is content → scrim → glass.
+                .background { shape.fill(.black.opacity(Self.glassScrimOpacity)) }
+                .glassEffect(.regular, in: shape)
         } else {
             content.background {
                 shape.fill(.ultraThinMaterial).opacity(0.82)
+                    .overlay { shape.fill(.black.opacity(Self.fallbackScrimOpacity)) }
             }
         }
     }
