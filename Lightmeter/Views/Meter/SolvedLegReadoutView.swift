@@ -15,9 +15,6 @@ struct SolvedLegReadoutView: View {
     /// than a pre-derived readout) keeps the derivation in one place and lets
     /// the view animate on the triangle it actually renders.
     let triangle: ExposureTriangle
-    /// Portrait's decluttered card renders the readout moderately smaller while
-    /// keeping it permanently visible; landscape keeps the full hero size.
-    var isCompact: Bool = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -31,8 +28,10 @@ struct SolvedLegReadoutView: View {
                 .textCase(.uppercase)
                 .tracking(1.5)
 
-            Text(readout.value ?? SolvedLegReadout.placeholder)
-                .font(.system(size: isCompact ? 34 : 46, weight: .semibold, design: .rounded))
+            Text(readout.value ?? ExposureTriangle.pendingMarking)
+                // Sized to the decluttered card both orientations now dock; the
+                // old readout's larger landscape variant had no caller left.
+                .font(.system(size: 34, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(.white)
                 .contentTransition(.numericText())
@@ -65,15 +64,13 @@ struct SolvedLegReadoutView: View {
             SolvedLegReadoutView(
                 triangle: ExposureEngine.solvedTriangle(
                     mode: .shutterPriority, evAtISO100: 15, iso: 400, aperture: 16, shutter: 1.0 / 500
-                ),
-                isCompact: true
+                )
             )
             // Pending — before the first reading.
             SolvedLegReadoutView(
                 triangle: ExposureEngine.solvedTriangle(
                     mode: .aperturePriority, evAtISO100: nil, iso: 100, aperture: 8, shutter: 1.0 / 125
-                ),
-                isCompact: true
+                )
             )
         }
         .padding()

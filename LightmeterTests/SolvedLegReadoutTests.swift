@@ -91,17 +91,23 @@ struct SolvedLegReadoutViewModelTests {
         await waitUntil { vm.ev != nil }
 
         vm.setAperture(16)
+        // A held shutter that solves to a *different* f-number than the held
+        // aperture, so the post-claim assertion below can't be satisfied by a
+        // value left over from before the flip.
+        vm.setShutter(1.0 / 500)
+
         #expect(vm.triangle.solved == .shutter)
         #expect(SolvedLegReadout(triangle: vm.triangle) == SolvedLegReadout(
             caption: "Shutter @ ISO 100", value: "1/125"
         ))
 
         // Tap-to-claim the shutter chip: shutter becomes the held leg and the
-        // hero switches to the aperture the app now solves.
+        // hero switches to the aperture the app now solves — EV 15 at ISO 100
+        // and 1/500 s → f/8, not the f/16 that was held a moment ago.
         vm.selectChip(.shutter)
         #expect(vm.triangle.solved == .aperture)
         #expect(SolvedLegReadout(triangle: vm.triangle) == SolvedLegReadout(
-            caption: "Aperture @ ISO 100", value: "f/16"
+            caption: "Aperture @ ISO 100", value: "f/8"
         ))
     }
 

@@ -29,4 +29,22 @@ struct ExposureTriangle: Equatable, Sendable {
     func isSolved(_ component: ExposureComponent) -> Bool {
         component == solved
     }
+
+    /// A leg's value as a camera marks it: a bare number for ISO, an f-number
+    /// for aperture, a duration for shutter. `nil` while the solved leg is
+    /// pending (before the first reading).
+    ///
+    /// The single source of the marking convention. The hero readout and the
+    /// value chips both render legs, so keeping "f/" in one place is what stops
+    /// them printing the same leg two different ways.
+    func marking(of component: ExposureComponent) -> String? {
+        switch component {
+        case .iso: iso.label
+        case .aperture: aperture.map { "f/\($0.label)" }
+        case .shutter: shutter?.label
+        }
+    }
+
+    /// Shown in place of a pending leg — the established em-dash placeholder.
+    static let pendingMarking = "—"
 }

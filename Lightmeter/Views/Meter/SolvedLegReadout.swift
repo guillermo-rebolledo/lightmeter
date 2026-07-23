@@ -35,24 +35,6 @@ extension SolvedLegReadout {
     /// Derives the hero from `triangle`'s solved leg.
     init(triangle: ExposureTriangle) {
         caption = "\(triangle.solved.caption) @ ISO \(triangle.iso.label)"
-        value = Self.marking(of: triangle.solved, in: triangle)
+        value = triangle.marking(of: triangle.solved)
     }
-
-    /// A leg's value as a camera marks it: a bare number for ISO, an f-number
-    /// for aperture, a duration for shutter. `nil` when the leg is pending.
-    private static func marking(
-        of component: ExposureComponent,
-        in triangle: ExposureTriangle
-    ) -> String? {
-        switch component {
-        // ISO is always a set input and never solved, but the mapping is kept
-        // total so a future mode can't silently fall through to a placeholder.
-        case .iso: triangle.iso.label
-        case .aperture: triangle.aperture.map { "f/\($0.label)" }
-        case .shutter: triangle.shutter?.label
-        }
-    }
-
-    /// Shown in place of a pending value — the established em-dash placeholder.
-    static let placeholder = "—"
 }

@@ -35,7 +35,7 @@ struct MeterHUDCard: View {
             // widest element is its caption ("Shutter @ ISO 100", ~130pt); centered
             // on even the narrowest iPhone card it clears the 44pt trailing icon by
             // a comfortable margin, so the overlay never collides with it.
-            SolvedLegReadoutView(triangle: model.triangle, isCompact: true)
+            SolvedLegReadoutView(triangle: model.triangle)
                 .frame(maxWidth: .infinity)
                 .overlay(alignment: .trailing) {
                     FreezeButton(
