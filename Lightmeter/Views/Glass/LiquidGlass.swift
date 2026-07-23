@@ -108,17 +108,23 @@ enum DrawerEdge {
 
 extension View {
     /// Docks the receiver as the HUD drawer against `edge`: stretches it along the
-    /// screen edge, lays the two-corner `GlassCardBackground` surface behind it (which
-    /// bleeds to the physical edge while the content stays inside the safe area), and
-    /// groups its glass — the surface and every glass control it holds (freeze, the
-    /// strip buttons, the chips) — into one `GlassEffectContainer` via `glassGroup()`
-    /// so adjacent glass blends as a single system; on the pre-26 fallback that
-    /// grouping is a passthrough. Shared by both layouts so the docking recipe lives
-    /// in one place even though the stretch axis differs per edge.
+    /// screen edge, groups the glass *controls* it holds (freeze, the strip buttons,
+    /// the chips) into one `GlassEffectContainer` via `glassGroup()` so adjacent
+    /// glass blends as a single system, then lays the two-corner `GlassCardBackground`
+    /// surface behind the whole group (which bleeds to the physical edge while the
+    /// content stays inside the safe area). Shared by both layouts so the docking
+    /// recipe lives in one place even though the stretch axis differs per edge.
+    ///
+    /// The surface is applied **outside** the container on purpose: a full-bleed
+    /// `glassEffect` surface *inside* the same container frosts the only two rows
+    /// that carry no glass pill of their own — the hero EV readout and the advisory
+    /// line — rendering them behind the drawer's own glass. Keeping the surface a
+    /// plain background behind the grouped content lets that content stay crisp on
+    /// top while the controls still blend among themselves.
     func docked(edge: DrawerEdge) -> some View {
         drawerStretch(edge: edge)
-            .modifier(GlassCardBackground(edge: edge))
             .glassGroup()
+            .modifier(GlassCardBackground(edge: edge))
     }
 
     /// Stretches the drawer along the screen edge it docks to: full-width at the
@@ -160,7 +166,7 @@ struct GlassCardBackground: ViewModifier {
     /// Tuned to hold text legibility over bright scenes without flattening the
     /// glass's refraction; the fallback leans darker since its material carries
     /// less depth of its own.
-    private static let glassScrimOpacity = 0.16
+    private static let glassScrimOpacity = 0.28
     private static let fallbackScrimOpacity = 0.32
 
     /// The two-corner shape: the inner corners rounded at 24pt, the edge corners
@@ -201,14 +207,57 @@ struct GlassCardBackground: ViewModifier {
 
     /// The scrim-over-surface stack, drawn behind the content so the order
     /// front-to-back is content → scrim → glass / material.
+    ///
+    /// The scrim is composited **in front of** the glass / material (an overlay on
+    /// iOS 26, an overlay on the fallback material) rather than tinted underneath
+    /// it: Liquid Glass refracts the bright preview above the drawer's inner edge,
+    /// and a scrim tinted *under* the glass is overpowered right where the hero EV
+    /// readout and the advisory line sit — the two rows that carry no glass pill of
+    /// their own. A gentle gradient adds extra darkening at that inner edge, fading
+    /// toward the screen edge so the glass still reads on the lower rows.
     @ViewBuilder private var surface: some View {
         if #available(iOS 26, *) {
             shape
-                .fill(.black.opacity(Self.glassScrimOpacity))
                 .glassEffect(.regular, in: shape)
+                .overlay { scrim }
         } else {
             shape.fill(.ultraThinMaterial).opacity(0.82)
-                .overlay { shape.fill(.black.opacity(Self.fallbackScrimOpacity)) }
+                .overlay { scrim }
+        }
+    }
+
+    /// The legibility scrim: a base level plus a boost at the drawer's inner
+    /// (rounded-corner) edge, where the glass pulls in the bright scene.
+    private var scrim: some View {
+        LinearGradient(
+            colors: [
+                .black.opacity(scrimOpacity + 0.16),
+                .black.opacity(scrimOpacity),
+            ],
+            startPoint: scrimStart,
+            endPoint: scrimEnd
+        )
+        .clipShape(shape)
+    }
+
+    /// The base scrim opacity for the active surface path.
+    private var scrimOpacity: CGFloat {
+        if #available(iOS 26, *) { Self.glassScrimOpacity } else { Self.fallbackScrimOpacity }
+    }
+
+    /// The gradient runs from the drawer's inner (content-facing, rounded) edge —
+    /// darkest, where the glass refracts the bright scene — toward the screen edge.
+    private var scrimStart: UnitPoint {
+        switch edge {
+        case .bottom: .top
+        case .trailing: .leading
+        }
+    }
+
+    private var scrimEnd: UnitPoint {
+        switch edge {
+        case .bottom: .bottom
+        case .trailing: .trailing
         }
     }
 }
