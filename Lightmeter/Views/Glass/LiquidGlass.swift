@@ -62,6 +62,34 @@ struct GlassPillBackground: ViewModifier {
     }
 }
 
+/// The freeze padlock's surface: a circular control beside the hero. iOS 26:
+/// interactive Liquid Glass in a circle. Pre-26: the same white-on-glass fill the
+/// chips use — the established look, complete on its own.
+///
+/// The held state rides on an accent ring rather than an accent fill, borrowing
+/// the chips' selection-ring vocabulary: the padlock glyph is already accent, and
+/// tinting the fill underneath it would put accent on accent. Like the chip ring
+/// it is a stroke inside the control's own bounds, so freezing costs no layout.
+struct GlassLockBackground: ViewModifier {
+    /// Whether the reading is held — the closed-padlock state, ringed.
+    let isHeld: Bool
+
+    func body(content: Content) -> some View {
+        surface(content)
+            .overlay(
+                Circle().strokeBorder(.tint.opacity(isHeld ? 0.9 : 0), lineWidth: 1.5)
+            )
+    }
+
+    @ViewBuilder private func surface(_ content: Content) -> some View {
+        if #available(iOS 26, *) {
+            content.glassEffect(.regular.interactive(), in: .circle)
+        } else {
+            content.background(.white.opacity(0.08), in: .circle)
+        }
+    }
+}
+
 /// An exposure-triangle chip surface. All three chips share one identical base
 /// surface — clear Liquid Glass on iOS 26, white-on-glass on the fallback — so the
 /// row reads as a single control rather than three differently-weighted fills.
