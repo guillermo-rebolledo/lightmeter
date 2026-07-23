@@ -35,17 +35,20 @@ struct ExposureChipsView: View {
 
     var body: some View {
         EqualWidthRow(spacing: 10) {
-            chip(for: .iso, value: triangle.iso.label)
-            chip(for: .aperture, value: triangle.aperture.map { "f/\($0.label)" } ?? "—")
-            chip(for: .shutter, value: triangle.shutter?.label ?? "—")
+            // Values come from `triangle.marking(of:)` — the same convention the
+            // hero readout renders the solved leg with, so a leg can never read
+            // one way in the chip and another in the hero.
+            chip(for: .iso)
+            chip(for: .aperture)
+            chip(for: .shutter)
         }
         .animation(reduceMotion ? nil : .snappy, value: triangle)
         .animation(reduceMotion ? nil : .snappy, value: boundComponent)
     }
 
-    private func chip(for component: ExposureComponent, value: String) -> ExposureValueChip {
+    private func chip(for component: ExposureComponent) -> ExposureValueChip {
         ExposureValueChip(
-            value: value,
+            value: triangle.marking(of: component) ?? ExposureTriangle.pendingMarking,
             role: Self.role(for: component, triangle: triangle),
             isBound: boundComponent == component,
             component: component,
