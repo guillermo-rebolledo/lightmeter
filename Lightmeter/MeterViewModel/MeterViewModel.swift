@@ -103,12 +103,22 @@ final class MeterViewModel {
         )
     }
 
-    /// The current owner of the single ruler dial. Binding any other control
-    /// replaces it, so exposure chips and compensation can never both be active.
-    private var dialTarget: DialTarget?
+    /// The current owner of the single ruler dial — always present, never empty.
+    /// A leg binding (the default) or the transient compensation overlay. Binding
+    /// any control replaces it, so a chip and compensation can never both be
+    /// active, and the dial always tracks exactly one editable leg the
+    /// photographer can drive. Placeholder here; `init` re-derives the opening
+    /// binding from the actual `mode`'s priority leg so the drawer never shows an
+    /// empty dial, and `setMode` keeps it on the priority leg thereafter.
+    private var dialTarget: DialTarget = .component(.aperture)
 
-    /// Which exposure chip is bound, or `nil` when compensation or no control
-    /// owns the dial.
+    /// The leg the dial binds to by default and returns *home* to — the priority
+    /// (photographer-controlled) leg of the current mode: aperture in
+    /// aperture-priority, shutter in shutter-priority. Never a solved leg.
+    private var homeComponent: ExposureComponent { mode.lockedComponent }
+
+    /// Which exposure chip the dial is bound to, or `nil` while the transient
+    /// compensation overlay owns the dial.
     var boundComponent: ExposureComponent? {
         guard case let .component(component) = dialTarget else { return nil }
         return component
@@ -140,6 +150,10 @@ final class MeterViewModel {
     init(source: LightSource, preferences: MeterPreferences) {
         self.source = source
         self.preferences = preferences
+        // Open the dial on the current mode's priority leg — never empty, never a
+        // solved leg — so the drawer shows a live dial the moment it appears.
+        // Derived from `mode` so the default can change without stranding the dial.
+        self.dialTarget = .component(mode.lockedComponent)
     }
 
     /// Requests camera access and, if granted, begins metering. On denial the
@@ -236,14 +250,13 @@ final class MeterViewModel {
 
     // MARK: - Priority mode
 
-    /// Switches the active priority mode. If the ruler dial was bound to the leg
-    /// that becomes solved (and so non-editable) under the new mode, it unbinds
-    /// so the dial never drives a computed leg.
+    /// Switches the active priority mode and re-binds the ruler dial to the new
+    /// priority (photographer-controlled) leg. Rebinding — rather than leaving the
+    /// old binding or emptying the dial — keeps the dial always tracking the leg
+    /// the mode is named for, and guarantees it never drives a now-solved leg.
     func setMode(_ newMode: PriorityMode) {
         mode = newMode
-        if boundComponent == newMode.solvedComponent {
-            dialTarget = nil
-        }
+        dialTarget = .component(newMode.lockedComponent)
     }
 
     /// Toggles between aperture- and shutter-priority — the single mode control.
@@ -313,19 +326,20 @@ final class MeterViewModel {
         component != triangle.solved
     }
 
-    /// Binds the ruler dial to `component`'s chip, or unbinds if it is already the
-    /// bound leg (tap to toggle). Non-editable (solved) legs are ignored. Only
-    /// one leg is ever bound — binding a new one replaces the old.
+    /// Binds the ruler dial to `component`'s chip. Non-editable (solved) legs are
+    /// ignored. Only one leg is ever bound — binding a new one replaces the old.
+    /// Re-tapping the already-bound leg is a no-op: the dial stays bound and
+    /// visible, so it can never be accidentally toggled off into an empty state.
     func bindDial(to component: ExposureComponent) {
         guard isEditable(component) else { return }
-        let target = DialTarget.component(component)
-        dialTarget = (dialTarget == target) ? nil : target
+        dialTarget = .component(component)
     }
 
-    /// Binds the shared ruler dial to EV compensation, or unbinds it when already
-    /// active. This replaces any exposure-chip binding.
+    /// Overlays the shared ruler dial with EV compensation, or — when compensation
+    /// already owns it — dismisses the overlay and returns the dial *home* to the
+    /// priority leg. The dial is never left empty.
     func bindCompensationDial() {
-        dialTarget = isCompensationDialBound ? nil : .compensation
+        dialTarget = isCompensationDialBound ? .component(homeComponent) : .compensation
     }
 
     /// The dial-able stops of the bound leg's scale, or empty when nothing is
@@ -349,8 +363,6 @@ final class MeterViewModel {
             component.scale(for: preferences.increment).stops.map(\.label)
         case .compensation:
             Self.compensationStops.map(Self.compensationDialLabel)
-        case nil:
-            []
         }
     }
 
@@ -364,8 +376,6 @@ final class MeterViewModel {
                 abs(Self.compensationStops[$0] - compensation)
                     < abs(Self.compensationStops[$1] - compensation)
             }
-        case nil:
-            nil
         }
     }
 
@@ -374,7 +384,6 @@ final class MeterViewModel {
         switch dialTarget {
         case let .component(component): component.caption
         case .compensation: "EV compensation"
-        case nil: nil
         }
     }
 
@@ -404,8 +413,6 @@ final class MeterViewModel {
         case .compensation:
             let clampedIndex = min(max(index, 0), Self.compensationStops.count - 1)
             setCompensation(Self.compensationStops[clampedIndex])
-        case nil:
-            break
         }
     }
 
