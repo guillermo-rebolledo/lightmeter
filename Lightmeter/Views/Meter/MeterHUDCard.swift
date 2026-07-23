@@ -79,7 +79,7 @@ extension MeterHUDCard {
     /// no scroll container, so it is an inert view identity there.
     static func scrollTarget(for step: GuidedTourStep) -> GuidedTourStep? {
         switch step {
-        case .evReadout: .evReadout
+        case .welcome, .evReadout: .evReadout
         case .meteringPattern, .compensation: .meteringPattern
         case .priorityAndChips: .priorityAndChips
         case .dial: .dial

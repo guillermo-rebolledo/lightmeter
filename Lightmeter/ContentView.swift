@@ -85,12 +85,19 @@ struct ContentView: View {
             // which shifts every cutout upward by roughly one control row.
             .overlayPreferenceValue(GuidedTourAnchorPreferenceKey.self) { anchors in
                 GeometryReader { geometry in
+                    // Anchored steps wait for their control's resolved frame; the
+                    // welcome step has no spotlight and renders a centered card
+                    // (nil target) immediately.
+                    let targetFrame = tour.currentStep
+                        .flatMap { anchors[$0] }
+                        .map { geometry[$0] }
+
                     if tour.isPresented,
                        let step = tour.currentStep,
-                       let anchor = anchors[step] {
+                       step.hasSpotlight == false || targetFrame != nil {
                         let overlay = GuidedTourOverlay(
                             step: step,
-                            targetFrame: geometry[anchor],
+                            targetFrame: targetFrame,
                             progressLabel: tour.progressLabel,
                             onAdvance: tour.advance,
                             onSkip: tour.skip
