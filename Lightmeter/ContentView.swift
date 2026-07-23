@@ -51,10 +51,15 @@ struct ContentView: View {
                         captureDevice: camera.captureDevice,
                         spot: model.spot,
                         isSpotActive: model.pattern == .spot,
+                        evReadout: evReadout,
                         onPlaceSpot: { model.placeSpot(at: $0) }
                     )
                     .ignoresSafeArea()
                     meterLayout
+                    // EV's home is the metered point, not the hero: on the
+                    // reticle in spot metering (drawn by the preview above), and
+                    // here as a quiet label when the whole frame is averaged.
+                    secondaryEVReadout
                     // The occasional controls live over the preview in the
                     // top-left — mirroring the settings gear opposite them —
                     // rather than inside the HUD card, so both states are
@@ -204,6 +209,31 @@ struct ContentView: View {
             .padding(.top, 4)
             .padding(.leading, 8)
     }
+
+    /// Where EV is shown over the preview, and what it reads — derived from the
+    /// already-published `pattern`/`spot`/`ev`. Owned here because both homes
+    /// hang off the preview: the reticle badge inside `CameraPreviewView`, and
+    /// the average-metering label below.
+    private var evReadout: PreviewEVReadout? {
+        PreviewEVReadout(pattern: model.pattern, spot: model.spot, ev: model.ev)
+    }
+
+    /// The average-metering EV label, floated at the top of the preview —
+    /// subordinate to the HUD's hero, and clear of the frame's center where the
+    /// photographer is composing. Centered *below* the status-pill row rather
+    /// than beside it, so the widest pair of pills can't crowd it on a narrow
+    /// phone; the pills' revealed editor is transient and draws over it.
+    private var secondaryEVReadout: some View {
+        PreviewEVReadoutView(readout: evReadout)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .padding(.top, statusPillRowHeight + 12)
+    }
+
+    /// The status pills' own row height — what the EV label clears — scaled with
+    /// Dynamic Type alongside the pills' footnote text, so the label doesn't
+    /// slide up into a row that grew.
+    @ScaledMetric(relativeTo: .footnote)
+    private var statusPillRowHeight: CGFloat = MeterStatusPills.rowHeight
 
     /// The step the tour is actually showing — only drive the pills' tour
     /// override while the tour is presented, otherwise their reveal stays purely
