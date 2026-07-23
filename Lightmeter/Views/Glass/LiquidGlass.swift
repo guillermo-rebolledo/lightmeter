@@ -66,9 +66,11 @@ struct GlassPillBackground: ViewModifier {
 /// surface — clear Liquid Glass on iOS 26, white-on-glass on the fallback — so the
 /// row reads as a single control rather than three differently-weighted fills.
 /// State rides on top as a single consistent cue: the dial-bound leg gets an
-/// accent ring (the "selected" marker). The solved leg is distinguished by its
-/// accent value text (set in `ExposureChipsView`), not by a different fill, so the
-/// set / bound / solved hierarchy stays legible without breaking the shared look.
+/// accent ring (the "selected" marker). The held and solved legs are distinguished
+/// by their padlock and text treatment (set in `ExposureChipsView`), not by a
+/// different fill, so the held / solved / plain hierarchy stays legible without
+/// breaking the shared look. The ring is a stroke inside the chip's own bounds, so
+/// it costs no layout and moving the dial never reflows the row.
 struct GlassChipBackground: ViewModifier {
     /// The chip the ruler dial is bound to — the only state that changes the
     /// surface, via an accent selection ring.
