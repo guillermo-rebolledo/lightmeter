@@ -14,6 +14,9 @@ struct FreezeButton: View {
     var body: some View {
         Button(action: onToggle) {
             label
+                // `glassEffect` contributes no hit region, so pin the tappable
+                // area to the full pill (matching the strip buttons and gear).
+                .contentShape(Capsule())
                 .modifier(GlassPillBackground(isActive: isFrozen))
         }
         .buttonStyle(.plain)

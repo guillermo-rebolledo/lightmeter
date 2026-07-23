@@ -31,22 +31,24 @@ struct MeterHUDCard: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            // Freeze is demoted to a small icon at the trailing edge; a matching
-            // empty slot on the leading edge keeps the readout centered without
-            // the icon ever overlapping it.
-            HStack(spacing: 0) {
-                Color.clear.frame(width: 44, height: 44)
-                EVReadoutView(ev: model.ev, isCompact: true)
-                    .frame(maxWidth: .infinity)
-                FreezeButton(
-                    isFrozen: model.isFrozen,
-                    // Mirror `toggleFreeze`'s own guard so the button stays
-                    // enabled in every state the toggle accepts.
-                    canFreeze: model.latestReading != nil || model.isFrozen,
-                    isCompact: true,
-                    onToggle: model.toggleFreeze
-                )
-            }
+            // Freeze is demoted to a small icon floated on the trailing edge as
+            // an overlay, so the readout centers across the full width with no
+            // mirrored empty slot opening a gap across the row. The readout's
+            // widest element is the fixed "EV @ ISO 100" caption (~100pt); centered
+            // on even the narrowest iPhone card it clears the 44pt trailing icon by
+            // a wide margin, so the overlay never collides with it.
+            EVReadoutView(ev: model.ev, isCompact: true)
+                .frame(maxWidth: .infinity)
+                .overlay(alignment: .trailing) {
+                    FreezeButton(
+                        isFrozen: model.isFrozen,
+                        // Mirror `toggleFreeze`'s own guard so the button stays
+                        // enabled in every state the toggle accepts.
+                        canFreeze: model.latestReading != nil || model.isFrozen,
+                        isCompact: true,
+                        onToggle: model.toggleFreeze
+                    )
+                }
             MeterAdvisories(advisories: advisories, isTourActive: isTourActive, isCompact: true)
             MeterControlStrip(model: model, tourStep: tourStep)
             ExposureChipsView(

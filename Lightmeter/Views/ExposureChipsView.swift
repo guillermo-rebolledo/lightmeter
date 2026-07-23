@@ -98,7 +98,11 @@ private struct ValueChip: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 11)
         .padding(.horizontal, 8)
-        .modifier(GlassChipBackground(isSolved: isSolved, isBound: isBound))
+        // `glassEffect` contributes no hit region, so pin the tappable area to
+        // the full chip; without it, tapping a set chip to bind the dial only
+        // registers on the caption/value text.
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .modifier(GlassChipBackground(isBound: isBound))
     }
 
     // The solved leg is accent-tinted throughout; the set legs read as plain
