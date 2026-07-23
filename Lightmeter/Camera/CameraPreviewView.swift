@@ -219,9 +219,10 @@ struct CameraPreviewView: UIViewRepresentable {
 /// — riding the reticle is what keeps EV glued to the tone it describes across
 /// layout and rotation.
 private final class ReticleView: UIView {
-    private static let side: CGFloat = 78
-    /// Clears the bracket without drifting far from the point it annotates.
-    private static let badgeGap: CGFloat = 6
+    /// The bracket's dimensions, shared with the design harness' SwiftUI
+    /// stand-in so the two drawings of one reticle cannot drift apart.
+    private static let side = ReticleGeometry.side
+    private static let badgeGap = ReticleGeometry.badgeGap
     private let shape = CAShapeLayer()
     private let dot = CAShapeLayer()
     private let badge = ReticleBadgeLabel()
@@ -245,7 +246,7 @@ private final class ReticleView: UIView {
         shape.shadowOffset = .zero
         layer.addSublayer(shape)
 
-        let dotRadius: CGFloat = 2
+        let dotRadius = ReticleGeometry.dotRadius
         let center = CGPoint(x: Self.side / 2, y: Self.side / 2)
         dot.path = UIBezierPath(
             arcCenter: center,
@@ -291,23 +292,17 @@ private final class ReticleView: UIView {
         )
     }
 
-    /// Four L-shaped corner brackets inset within a `side × side` square.
+    /// Four L-shaped corner brackets inset within a `side × side` square, stroked
+    /// from the shared `ReticleGeometry` polylines.
     private static func bracketPath(side: CGFloat) -> CGPath {
         let path = UIBezierPath()
-        let inset: CGFloat = 2
-        let tick = side * 0.22
-        let lo = inset
-        let hi = side - inset
-
-        // Top-left
-        path.move(to: CGPoint(x: lo, y: lo + tick)); path.addLine(to: CGPoint(x: lo, y: lo)); path.addLine(to: CGPoint(x: lo + tick, y: lo))
-        // Top-right
-        path.move(to: CGPoint(x: hi - tick, y: lo)); path.addLine(to: CGPoint(x: hi, y: lo)); path.addLine(to: CGPoint(x: hi, y: lo + tick))
-        // Bottom-right
-        path.move(to: CGPoint(x: hi, y: hi - tick)); path.addLine(to: CGPoint(x: hi, y: hi)); path.addLine(to: CGPoint(x: hi - tick, y: hi))
-        // Bottom-left
-        path.move(to: CGPoint(x: lo + tick, y: hi)); path.addLine(to: CGPoint(x: lo, y: hi)); path.addLine(to: CGPoint(x: lo, y: hi - tick))
-
+        for corner in ReticleGeometry.bracketPolylines(side: side) {
+            guard let start = corner.first else { continue }
+            path.move(to: start)
+            for point in corner.dropFirst() {
+                path.addLine(to: point)
+            }
+        }
         return path.cgPath
     }
 }

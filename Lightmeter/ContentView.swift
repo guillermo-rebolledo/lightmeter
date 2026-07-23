@@ -11,7 +11,11 @@ struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityVoiceOverEnabled) private var isVoiceOverRunning
     @Environment(\.verticalSizeClass) private var verticalSizeClass
-    @State private var camera: CameraLightSource
+    /// The real camera, or `nil` when the meter is being driven by an injected
+    /// source. It is what the preview binds to, so its absence is also what says
+    /// "there is no capture device to show" — the condition the stand-in backdrop
+    /// answers.
+    @State private var camera: CameraLightSource?
     @State private var model: MeterViewModel
     @State private var preferences: MeterPreferences
     @State private var tour: GuidedTourController
@@ -33,10 +37,27 @@ struct ContentView: View {
     /// the variant winning; restoring it is a one-line change here.
     static let guidedTourSteps: [GuidedTourStep] = []
 
-    init(defaults: UserDefaults = .standard) {
-        let camera = CameraLightSource()
+    /// - Parameters:
+    ///   - defaults: Where meter preferences are persisted.
+    ///   - source: The light source to meter from. Defaults to `nil`, which
+    ///     builds and uses the real `CameraLightSource` — production behaviour is
+    ///     exactly what it was. A non-`nil` source means there is no capture
+    ///     device behind the screen, so the preview is replaced by a stand-in
+    ///     backdrop. Only the debug design harness passes one.
+    init(defaults: UserDefaults = .standard, source: LightSource? = nil) {
+        let camera: CameraLightSource?
+        let meteredSource: LightSource
+        if let source {
+            camera = nil
+            meteredSource = source
+        } else {
+            let realCamera = CameraLightSource()
+            camera = realCamera
+            meteredSource = realCamera
+        }
+
         let preferences = MeterPreferences(defaults: defaults)
-        let model = MeterViewModel(source: camera, preferences: preferences)
+        let model = MeterViewModel(source: meteredSource, preferences: preferences)
         _camera = State(initialValue: camera)
         _model = State(initialValue: model)
         _preferences = State(initialValue: preferences)
@@ -56,15 +77,7 @@ struct ContentView: View {
 
                 switch model.status {
                 case .idle, .metering:
-                    CameraPreviewView(
-                        session: camera.session,
-                        captureDevice: camera.captureDevice,
-                        spot: model.spot,
-                        isSpotActive: model.pattern == .spot,
-                        evReadout: evReadout,
-                        onPlaceSpot: { model.placeSpot(at: $0) }
-                    )
-                    .ignoresSafeArea()
+                    backdrop
                     meterLayout
                     // EV's home is the metered point, not the hero: on the
                     // reticle in spot metering (drawn by the preview above), and
@@ -179,6 +192,42 @@ struct ContentView: View {
 
     /// iPhone landscape: the compact vertical size class drives the edge layout.
     private var isLandscape: Bool { verticalSizeClass == .compact }
+
+    /// What sits behind the HUD: the live camera preview — the hero — whenever
+    /// there is a capture device, and the design harness' stand-in scene when
+    /// there isn't. Production always takes the first branch.
+    @ViewBuilder private var backdrop: some View {
+        if let camera {
+            CameraPreviewView(
+                session: camera.session,
+                captureDevice: camera.captureDevice,
+                spot: model.spot,
+                isSpotActive: model.pattern == .spot,
+                evReadout: evReadout,
+                onPlaceSpot: { model.placeSpot(at: $0) }
+            )
+            .ignoresSafeArea()
+        } else {
+            standInBackdrop
+        }
+    }
+
+    /// The backdrop where there is no capture device. Only the debug design
+    /// harness can reach it — a Release build has no way to inject a source, so
+    /// `camera` is never `nil` and this branch never renders.
+    @ViewBuilder private var standInBackdrop: some View {
+        #if DEBUG
+        StandInSceneView(
+            scene: DesignHarness.backdropScene,
+            spot: model.spot,
+            isSpotActive: model.pattern == .spot,
+            evReadout: evReadout,
+            onPlaceSpot: { model.placeSpot(at: $0) }
+        )
+        #else
+        Color.black.ignoresSafeArea()
+        #endif
+    }
 
     /// The meter HUD, arranged for the current orientation. Both containers
     /// compose the same shared control views (with stable tour anchors) over the
