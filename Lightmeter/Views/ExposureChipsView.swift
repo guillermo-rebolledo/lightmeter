@@ -52,7 +52,7 @@ struct ExposureChipsView: View {
                 onSelect: onSelect
             )
         }
-        .animation(.snappy, value: triangle)
+        .animation(reduceMotion ? nil : .snappy, value: triangle)
         .animation(reduceMotion ? nil : .snappy, value: boundComponent)
     }
 
