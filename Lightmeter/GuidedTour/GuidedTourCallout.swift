@@ -16,7 +16,7 @@ struct GuidedTourCallout: View {
 
                 Button(step.advanceButtonTitle, action: onAdvance)
                     .buttonStyle(.borderedProminent)
-                    .tint(.yellow)
+                    .tint(Color.appAccent)
                     .foregroundStyle(.black)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }

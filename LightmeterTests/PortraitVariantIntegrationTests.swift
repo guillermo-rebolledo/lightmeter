@@ -176,8 +176,8 @@ struct PortraitVariantIntegrationTests {
             for component in [ExposureComponent.iso, .aperture, .shutter] {
                 let role = ExposureChipsView.role(for: component, triangle: model.triangle)
                 let value = model.triangle.marking(of: component) ?? ExposureTriangle.pendingMarking
-                #expect(role.spokenValue(value).isEmpty == false)
-                #expect(role.spokenHint(isBound: model.boundComponent == component).isEmpty == false)
+                #expect(role.accessibilityValue(value).isEmpty == false)
+                #expect(role.accessibilityHint(isBound: model.boundComponent == component).isEmpty == false)
             }
 
             let lock = FreezeButton.LockState(isFrozen: model.isFrozen)
@@ -232,11 +232,17 @@ struct PortraitVariantIntegrationTests {
     /// in the state that would otherwise trigger it (metering, a reading in hand,
     /// never seen before). Pinned against the steps `ContentView` actually hands
     /// the controller, so re-enabling the tour can't happen by accident.
-    @Test func theGuidedTourNeverPresentsOnTheVariant() async {
+    @Test func theGuidedTourNeverPresentsOnTheVariant() async throws {
         #expect(ContentView.guidedTourSteps.isEmpty)
 
-        let preferences = MeterPreferences(defaults: UserDefaults(suiteName: #function)!)
-        preferences.hasSeenGuidedTour = false
+        // A fresh, torn-down defaults suite, as the other suites do: a first-run
+        // user is exactly the state that would present the tour, so it must not
+        // be a leftover from an earlier run that makes this pass.
+        let suiteName = "PortraitVariantIntegrationTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preferences = MeterPreferences(defaults: defaults)
+        #expect(preferences.hasSeenGuidedTour == false)
         let controller = GuidedTourController(
             preferences: preferences,
             model: await meteringModel(),

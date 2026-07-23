@@ -75,7 +75,7 @@ struct ExposureChipsView: View {
         /// What VoiceOver reads as the chip's value. The padlock and the accent are
         /// both silent, so the held state rides on the value — otherwise the
         /// variant's central cue would be sighted-only.
-        func spokenValue(_ value: String) -> String {
+        func accessibilityValue(_ value: String) -> String {
             self == .held ? "\(value), held" : value
         }
 
@@ -84,7 +84,7 @@ struct ExposureChipsView: View {
         /// the leg to the photographer — so it must read as claimable rather than
         /// "not editable", even in the corner where the dial happens to be bound to
         /// it.
-        func spokenHint(isBound: Bool) -> String {
+        func accessibilityHint(isBound: Bool) -> String {
             if self == .solved { return "Auto — tap to control" }
             return isBound ? "Bound to dial" : "Bind to dial"
         }
@@ -138,9 +138,9 @@ struct ExposureValueChip: View {
 
     /// The spoken strings live on the role, so what a chip says is testable
     /// without a view — the same shape as the marking glyph beside them.
-    private var accessibilityValue: String { role.spokenValue(value) }
+    private var accessibilityValue: String { role.accessibilityValue(value) }
 
-    private var accessibilityHint: String { role.spokenHint(isBound: isBound) }
+    private var accessibilityHint: String { role.accessibilityHint(isBound: isBound) }
 
     private var chipContent: some View {
         VStack(spacing: 3) {

@@ -80,9 +80,9 @@ struct ExposureChipsViewTests {
     /// rides on the value — otherwise the variant's central cue (which leg am I
     /// holding?) would be sighted-only.
     @Test func onlyTheHeldChipSpeaksThatItIsHeld() {
-        #expect(ExposureChipsView.ChipRole.held.spokenValue("f/16") == "f/16, held")
-        #expect(ExposureChipsView.ChipRole.solved.spokenValue("1/125") == "1/125")
-        #expect(ExposureChipsView.ChipRole.plain.spokenValue("100") == "100")
+        #expect(ExposureChipsView.ChipRole.held.accessibilityValue("f/16") == "f/16, held")
+        #expect(ExposureChipsView.ChipRole.solved.accessibilityValue("1/125") == "1/125")
+        #expect(ExposureChipsView.ChipRole.plain.accessibilityValue("100") == "100")
     }
 
     /// The solved chip is computed by the app but still interactive — tapping it
@@ -90,7 +90,7 @@ struct ExposureChipsViewTests {
     /// read-only field, even when the dial happens to be bound to it.
     @Test func theSolvedChipHintsThatItCanBeClaimed() {
         for isBound in [false, true] {
-            #expect(ExposureChipsView.ChipRole.solved.spokenHint(isBound: isBound)
+            #expect(ExposureChipsView.ChipRole.solved.accessibilityHint(isBound: isBound)
                 == "Auto — tap to control")
         }
     }
@@ -99,17 +99,17 @@ struct ExposureChipsViewTests {
     /// the dial here, or report that it is already here.
     @Test func theOwnedChipsHintAtTheDialBinding() {
         for role in [ExposureChipsView.ChipRole.held, .plain] {
-            #expect(role.spokenHint(isBound: false) == "Bind to dial")
-            #expect(role.spokenHint(isBound: true) == "Bound to dial")
+            #expect(role.accessibilityHint(isBound: false) == "Bind to dial")
+            #expect(role.accessibilityHint(isBound: true) == "Bound to dial")
         }
     }
 
     /// No role leaves a VoiceOver slot empty, in either dial-binding state.
     @Test func noRoleLeavesAVoiceOverSlotEmpty() {
         for role in [ExposureChipsView.ChipRole.held, .solved, .plain] {
-            #expect(role.spokenValue("f/16").isEmpty == false)
-            #expect(role.spokenHint(isBound: false).isEmpty == false)
-            #expect(role.spokenHint(isBound: true).isEmpty == false)
+            #expect(role.accessibilityValue("f/16").isEmpty == false)
+            #expect(role.accessibilityHint(isBound: false).isEmpty == false)
+            #expect(role.accessibilityHint(isBound: true).isEmpty == false)
         }
     }
 
