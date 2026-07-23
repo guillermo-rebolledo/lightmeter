@@ -8,7 +8,7 @@ import SwiftUI
 /// the pre-26 branch is never empty or broken. The glass path is gated behind
 /// `if #available(iOS 26, *)` in one place per surface so the call sites stay flat.
 ///
-/// The interactive surfaces (freeze button, control-strip buttons, exposure
+/// The interactive surfaces (freeze padlock, the top-left status pills, exposure
 /// chips, settings gear) each get a purpose-built modifier below; the shared
 /// `MeterHUDCard` groups its glass with `glassGroup()` so adjacent elements blend
 /// inside a single `GlassEffectContainer`. Because portrait and landscape compose
@@ -34,12 +34,12 @@ extension View {
     }
 }
 
-/// A capsule control surface — the freeze icon button and the control-strip icon
-/// buttons. iOS 26: interactive Liquid Glass, accent-tinted while active. Pre-26:
+/// A capsule control surface — the top-left status pills and the controls they
+/// reveal. iOS 26: interactive Liquid Glass, accent-tinted while active. Pre-26:
 /// the tint/white capsule fill with an accent ring — the established look.
 struct GlassPillBackground: ViewModifier {
-    /// Whether the control is in its active/selected state (frozen, or the open
-    /// strip section): a brighter tint and a full ring on both paths.
+    /// Whether the control is in its active/selected state (the pill whose editor
+    /// is open): a brighter tint and a full ring on both paths.
     let isActive: Bool
 
     func body(content: Content) -> some View {
@@ -138,7 +138,7 @@ enum DrawerEdge {
 
 extension View {
     /// Docks the receiver as the HUD drawer against `edge`: stretches it along the
-    /// screen edge, groups the glass *controls* it holds (freeze, the strip buttons,
+    /// screen edge, groups the glass *controls* it holds (the freeze padlock and
     /// the chips) into one `GlassEffectContainer` via `glassGroup()` so adjacent
     /// glass blends as a single system, then lays the two-corner `GlassCardBackground`
     /// surface behind the whole group (which bleeds to the physical edge while the

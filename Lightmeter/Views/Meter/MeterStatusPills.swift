@@ -81,13 +81,14 @@ struct MeterStatusPills: View {
         }
     }
 
-    /// The revealed editor's width. The pills float over the preview rather than
-    /// stretching a card, so the attached surface is sized to hold the pattern
-    /// toggle's two segments comfortably and no wider — the frame stays clear.
-    private static let editorWidth: CGFloat = 220
-
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var openEditor: Control?
+    /// The revealed editor's width. The pills float over the preview rather than
+    /// stretching a card, so the attached surface is sized to hold the pattern
+    /// toggle's two labelled segments comfortably and no wider — the frame stays
+    /// clear. Scaled with Dynamic Type so those labels don't truncate at the
+    /// larger text sizes.
+    @ScaledMetric(relativeTo: .footnote) private var editorWidth: CGFloat = 250
 
     /// The editor actually shown: the tour override wins while the tour drives a
     /// pill's step; otherwise the photographer's own open editor (untouched by the
@@ -104,7 +105,12 @@ struct MeterStatusPills: View {
             }
             if let editor = effectiveOpen {
                 revealed(editor)
-                    .frame(width: Self.editorWidth)
+                    .frame(width: editorWidth)
+                    // The revealed controls were drawn for the HUD card, which
+                    // carries its own legibility scrim; floating them over a live
+                    // preview needs the same protection, so they get the pills'
+                    // scrim-over-surface treatment too.
+                    .modifier(PreviewFloatingBackground())
                     // Slide-and-fade in the non-reduced path; the animation below
                     // is nil'd out under Reduce Motion, turning this into a plain,
                     // instantaneous swap.
@@ -120,8 +126,7 @@ struct MeterStatusPills: View {
     private func pill(_ control: Control) -> some View {
         MeterStatusPill(
             control: control,
-            systemImage: control.systemImage(in: model),
-            value: control.value(in: model),
+            model: model,
             isOpen: effectiveOpen == control,
             onTap: { toggle(control) }
         )
@@ -162,14 +167,16 @@ struct MeterStatusPills: View {
     }
 }
 
-/// A single status pill: a glyph and the control's current state on a small glass
-/// capsule. Internal rather than private so `MeterStatusPillsTests` can measure
-/// that opening a pill doesn't resize it.
+/// A single status pill: an accent glyph and the control's current state on a
+/// small glass capsule. Internal rather than private so `MeterStatusPillsTests`
+/// can measure that opening a pill doesn't resize it.
+///
+/// It derives its glyph and value from the control and the model rather than
+/// taking them pre-rendered, so a pill can never be handed one control's name
+/// beside another's state.
 struct MeterStatusPill: View {
     let control: MeterStatusPills.Control
-    let systemImage: String
-    /// The control's current state, shown on the pill and spoken as its value.
-    let value: String
+    let model: MeterViewModel
     /// Whether this pill's editor is revealed — an accent treatment, no resize.
     let isOpen: Bool
     let onTap: () -> Void
@@ -177,12 +184,20 @@ struct MeterStatusPill: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 5) {
-                Image(systemName: systemImage)
-                Text(value)
+                // The glyph carries the accent in every state — the pills are
+                // always visible, so waiting for the editor to open would leave
+                // them reading as plain chrome the whole time they're used.
+                Image(systemName: control.systemImage(in: model))
+                    .foregroundStyle(.tint)
+                Text(control.value(in: model))
+                    .foregroundStyle(isOpen ? AnyShapeStyle(.tint) : AnyShapeStyle(.white))
                     .lineLimit(1)
+                    // The pair sits over the preview with no card to grow into,
+                    // so an accessibility text size shrinks the value rather than
+                    // pushing the pills off the frame.
+                    .minimumScaleFactor(0.7)
             }
             .font(.footnote.weight(.semibold))
-            .foregroundStyle(isOpen ? AnyShapeStyle(.tint) : AnyShapeStyle(.white))
             .padding(.horizontal, 12)
             // A minimal pill that is still a real target: the 44pt minimum is
             // held by the frame, not by fattening the visible capsule.
@@ -191,36 +206,44 @@ struct MeterStatusPill: View {
             // pin the tappable area to the whole capsule — the same explicit
             // content shape the settings gear and the chips carry.
             .contentShape(Capsule())
+            .modifier(PreviewFloatingBackground())
             .modifier(GlassPillBackground(isActive: isOpen))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(control.accessibilityLabel)
-        .accessibilityValue(value)
+        .accessibilityValue(control.value(in: model))
         .accessibilityAddTraits(isOpen ? .isSelected : [])
         .accessibilityHint(control.accessibilityHint(isOpen: isOpen))
     }
 }
 
+/// The legibility scrim for a control floating on the raw camera preview.
+///
+/// The HUD drawer gets this from `GlassCardBackground`; the pills and their
+/// revealed editors sit outside it, directly over a scene that can be a blown-out
+/// sky, where glass alone (or the fallback's white-on-nothing fill) washes the
+/// white and `.secondary` text out. Composited the same way the drawer's scrim
+/// is — behind the content, in front of the surface — so it darkens the
+/// refraction rather than sitting under it. Applied *before* the surface modifier
+/// at each call site, which is what puts the glass behind it.
+struct PreviewFloatingBackground: ViewModifier {
+    /// Matched to the drawer's scrim: enough to hold text contrast over a bright
+    /// scene without flattening the glass.
+    private static let scrimOpacity = 0.3
+
+    func body(content: Content) -> some View {
+        content.background(Capsule().fill(.black.opacity(Self.scrimOpacity)))
+    }
+}
+
 #Preview {
     ZStack {
-        Color.black.ignoresSafeArea()
-        VStack(alignment: .leading) {
-            MeterStatusPill(
-                control: .pattern,
-                systemImage: MeteringPattern.spot.systemImage,
-                value: MeteringPattern.spot.label,
-                isOpen: false,
-                onTap: {}
-            )
-            MeterStatusPill(
-                control: .compensation,
-                systemImage: "plusminus",
-                value: "+1.0 EV",
-                isOpen: true,
-                onTap: {}
-            )
-        }
-        .padding()
+        // Stand in for a blown-out sky: the case the pills' scrim exists for.
+        LinearGradient(colors: [.white, .cyan], startPoint: .top, endPoint: .bottom)
+            .ignoresSafeArea()
+        MeterStatusPills(model: MeterViewModel(source: CameraLightSource()))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding()
     }
     .tint(.appAccent)
     .preferredColorScheme(.dark)

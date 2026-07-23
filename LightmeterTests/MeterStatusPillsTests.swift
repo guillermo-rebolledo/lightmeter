@@ -88,12 +88,14 @@ struct MeterStatusPillsTests {
         }
     }
 
+    /// Each pill measured with its *own* glyph and state — the pill derives both
+    /// from the control and the model, so there's no way to measure one control's
+    /// pill wearing another's content.
     @MainActor
     private func idealPillSize(control: MeterStatusPills.Control, isOpen: Bool) -> CGSize {
         let pill = MeterStatusPill(
             control: control,
-            systemImage: "plusminus",
-            value: "+0.0 EV",
+            model: MeterViewModel(source: FakeLightSource()),
             isOpen: isOpen,
             onTap: {}
         )
