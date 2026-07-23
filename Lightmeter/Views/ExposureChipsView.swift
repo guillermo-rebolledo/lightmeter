@@ -14,16 +14,14 @@ import SwiftUI
 ///   - **Plain** — ISO: a set input, but not the priority commitment the padlock
 ///     reports, so it carries no marking in either mode.
 ///
-/// This inverts the previous AUTO badge, which marked the *solved* leg. The
-/// interaction wiring is untouched — every chip is still a button routing through
-/// `onSelect`, and the dial-bound leg still wears a selection ring, drawn as a
-/// stroke inside the chip's own bounds so it costs no layout.
+/// Every chip is a button routing through `onSelect`, and the dial-bound leg wears
+/// a selection ring — drawn as a stroke inside the chip's own bounds, so it costs
+/// no layout.
 ///
-/// **Zero reflow.** All three chips are laid out at equal width, and the marking
-/// rides in a slot of constant size that is reserved whether or not a glyph fills
-/// it. Changing priority therefore never resizes or shifts a chip — designing out
-/// the old defect where the AUTO badge grew the chip it landed on and the row
-/// reflowed under the photographer's thumb mid-tap.
+/// **Zero reflow.** The photographer taps these by position, often without looking,
+/// so a column must never move: `EqualWidthRow` divides the row into exactly equal
+/// columns, and the marking rides in a slot of constant size that is reserved
+/// whether or not a glyph fills it. Claiming priority is therefore a pure repaint.
 struct ExposureChipsView: View {
     let triangle: ExposureTriangle
     /// Which leg the ruler dial is currently bound to, or `nil` while the
@@ -36,7 +34,7 @@ struct ExposureChipsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        HStack(spacing: 10) {
+        EqualWidthRow(spacing: 10) {
             chip(for: .iso, value: triangle.iso.label)
             chip(for: .aperture, value: triangle.aperture.map { "f/\($0.label)" } ?? "—")
             chip(for: .shutter, value: triangle.shutter?.label ?? "—")
@@ -45,19 +43,14 @@ struct ExposureChipsView: View {
         .animation(reduceMotion ? nil : .snappy, value: boundComponent)
     }
 
-    /// One chip, stretched to an equal share of the row. Every chip is equally
-    /// flexible and none of them has a role-dependent ideal width, so the row
-    /// always divides into three identical columns.
-    private func chip(for component: ExposureComponent, value: String) -> some View {
+    private func chip(for component: ExposureComponent, value: String) -> ExposureValueChip {
         ExposureValueChip(
-            caption: component.caption,
             value: value,
             role: Self.role(for: component, triangle: triangle),
             isBound: boundComponent == component,
             component: component,
             onSelect: onSelect
         )
-        .frame(maxWidth: .infinity)
     }
 
     /// How a chip presents itself — its role in the priority hierarchy.
@@ -68,6 +61,13 @@ struct ExposureChipsView: View {
         case solved
         /// A leg that is neither held nor solved (ISO): no marking.
         case plain
+
+        /// The glyph this role puts in the chip's marking slot, or `nil` for the
+        /// roles that show nothing. A *closed* padlock, because the leg is pinned by
+        /// the photographer — the meter may not move it.
+        var markingSymbol: String? {
+            self == .held ? "lock.fill" : nil
+        }
     }
 
     /// The role of `component`'s chip. ISO is always plain — it is an input, but not
@@ -82,13 +82,6 @@ struct ExposureChipsView: View {
         return triangle.isSolved(component) ? .solved : .held
     }
 
-    /// The glyph `role` puts in the chip's marking slot, or `nil` for the roles that
-    /// show nothing. A *closed* padlock, because the leg is pinned by the
-    /// photographer — the meter may not move it.
-    static func markingSymbol(for role: ChipRole) -> String? {
-        role == .held ? "lock.fill" : nil
-    }
-
     /// The size the marking slot occupies in every chip, glyph or no glyph. Reserved
     /// unconditionally so a role change is a pure repaint.
     static let markingSlotSize = CGSize(width: 11, height: 12)
@@ -101,7 +94,6 @@ struct ExposureChipsView: View {
 /// Internal rather than private so `ExposureChipsViewTests` can measure that a
 /// chip's footprint is identical across roles.
 struct ExposureValueChip: View {
-    let caption: String
     let value: String
     let role: ExposureChipsView.ChipRole
     /// Whether the ruler dial is currently bound to this leg — orthogonal to
@@ -118,7 +110,7 @@ struct ExposureValueChip: View {
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(caption)
+        .accessibilityLabel(component.caption)
         .accessibilityValue(accessibilityValue)
         .accessibilityAddTraits(isBound ? .isSelected : [])
         .accessibilityHint(accessibilityHint)
@@ -130,18 +122,19 @@ struct ExposureValueChip: View {
         role == .held ? "\(value), held" : value
     }
 
+    /// The solved leg is checked first: it is computed by the app but interactive —
+    /// tapping it hands control of the leg to the photographer — so it must read as
+    /// claimable rather than "not editable", even in the corner where the dial
+    /// happens to be bound to it.
     private var accessibilityHint: String {
-        if isBound { return "Bound to dial" }
-        // The solved leg is computed by the app but interactive — tapping it hands
-        // control of this leg to the photographer, so it reads as claimable rather
-        // than "not editable".
-        return role == .solved ? "Auto — tap to control" : "Bind to dial"
+        if role == .solved { return "Auto — tap to control" }
+        return isBound ? "Bound to dial" : "Bind to dial"
     }
 
     private var chipContent: some View {
         VStack(spacing: 3) {
             HStack(spacing: 4) {
-                Text(caption)
+                Text(component.caption)
                     .font(.caption2.weight(.semibold))
                     .textCase(.uppercase)
                     .tracking(1)
@@ -181,7 +174,7 @@ struct ExposureValueChip: View {
                 height: ExposureChipsView.markingSlotSize.height
             )
             .overlay {
-                if let symbol = ExposureChipsView.markingSymbol(for: role) {
+                if let symbol = role.markingSymbol {
                     Image(systemName: symbol)
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(.tint)

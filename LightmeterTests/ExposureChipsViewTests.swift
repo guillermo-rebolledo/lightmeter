@@ -69,9 +69,9 @@ struct ExposureChipsViewTests {
     /// Only the held leg carries a glyph, and it's a *closed* padlock — the leg is
     /// pinned by the photographer.
     @Test func onlyTheHeldLegCarriesAClosedPadlock() {
-        #expect(ExposureChipsView.markingSymbol(for: .held) == "lock.fill")
-        #expect(ExposureChipsView.markingSymbol(for: .solved) == nil)
-        #expect(ExposureChipsView.markingSymbol(for: .plain) == nil)
+        #expect(ExposureChipsView.ChipRole.held.markingSymbol == "lock.fill")
+        #expect(ExposureChipsView.ChipRole.solved.markingSymbol == nil)
+        #expect(ExposureChipsView.ChipRole.plain.markingSymbol == nil)
     }
 
     // MARK: - Zero-reflow footprint
@@ -104,7 +104,6 @@ struct ExposureChipsViewTests {
         isBound: Bool = false
     ) -> CGSize {
         let chip = ExposureValueChip(
-            caption: "Aperture",
             value: "f/16",
             role: role,
             isBound: isBound,
