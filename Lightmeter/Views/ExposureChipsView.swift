@@ -30,30 +30,25 @@ struct ExposureChipsView: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            ValueChip(
-                caption: "ISO",
-                value: triangle.iso.label,
-                role: Self.role(for: .iso, triangle: triangle, boundComponent: boundComponent),
-                component: .iso,
-                onSelect: onSelect
-            )
-            ValueChip(
-                caption: "Aperture",
-                value: triangle.aperture.map { "f/\($0.label)" } ?? "—",
-                role: Self.role(for: .aperture, triangle: triangle, boundComponent: boundComponent),
-                component: .aperture,
-                onSelect: onSelect
-            )
-            ValueChip(
-                caption: "Shutter",
-                value: triangle.shutter?.label ?? "—",
-                role: Self.role(for: .shutter, triangle: triangle, boundComponent: boundComponent),
-                component: .shutter,
-                onSelect: onSelect
-            )
+            // Values come from `triangle.marking(of:)` — the same convention the
+            // hero readout renders the solved leg with, so a leg can never read
+            // one way in the chip and another in the hero.
+            chip(for: .iso)
+            chip(for: .aperture)
+            chip(for: .shutter)
         }
         .animation(reduceMotion ? nil : .snappy, value: triangle)
         .animation(reduceMotion ? nil : .snappy, value: boundComponent)
+    }
+
+    private func chip(for component: ExposureComponent) -> some View {
+        ValueChip(
+            caption: component.caption,
+            value: triangle.marking(of: component) ?? ExposureTriangle.pendingMarking,
+            role: Self.role(for: component, triangle: triangle, boundComponent: boundComponent),
+            component: component,
+            onSelect: onSelect
+        )
     }
 
     /// How a chip presents itself — its role in the priority/editing hierarchy.
