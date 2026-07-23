@@ -47,19 +47,43 @@ struct MeterHUDCard: View {
                         onToggle: model.toggleFreeze
                     )
                 }
+                .id(GuidedTourStep.evReadout)
             MeterAdvisories(advisories: advisories, isTourActive: isTourActive, isCompact: true)
             MeterControlStrip(model: model, tourStep: tourStep)
+                // Holds both the `.compensation` and `.meteringPattern` anchors.
+                .id(GuidedTourStep.meteringPattern)
             ExposureChipsView(
                 triangle: model.triangle,
                 boundComponent: model.boundComponent,
                 onSelect: { model.bindDial(to: $0) }
             )
             .guidedTourAnchor(.priorityAndChips)
+            .id(GuidedTourStep.priorityAndChips)
             // The ruler dial is always horizontal now, folded under the chips in
             // both orientations; the separate vertical-dial slot landscape used to
             // mount on its trailing edge is gone.
             MeterDialHost(model: model)
+                .id(GuidedTourStep.dial)
         }
         .padding(14)
+    }
+}
+
+extension MeterHUDCard {
+    /// The scroll-target `id` for the row holding `step`'s tour anchor — the stable
+    /// `.id(...)` values pinned on the rows above. When the landscape drawer is tall
+    /// enough to scroll (short heights, large Dynamic Type), `LandscapeMeterLayout`
+    /// scrolls to this id so the active guided-tour control is revealed rather than
+    /// left off-screen under a stranded spotlight. `nil` for `.settings`, whose gear
+    /// lives outside the drawer. Rows carry the same id in portrait, where there is
+    /// no scroll container, so it is an inert view identity there.
+    static func scrollTarget(for step: GuidedTourStep) -> GuidedTourStep? {
+        switch step {
+        case .evReadout: .evReadout
+        case .meteringPattern, .compensation: .meteringPattern
+        case .priorityAndChips: .priorityAndChips
+        case .dial: .dial
+        case .settings: nil
+        }
     }
 }

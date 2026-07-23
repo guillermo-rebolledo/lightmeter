@@ -25,6 +25,8 @@ struct LandscapeMeterLayout: View {
     /// strip so it can force-open the section the active step targets.
     var tourStep: GuidedTourStep?
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     /// The trailing drawer's fixed content width, sized to hold the folded-in
     /// controls (and the horizontal ruler) comfortably without crowding the
     /// preview hero. Shared with `ContentView` so the settings gear can inset
@@ -40,22 +42,42 @@ struct LandscapeMeterLayout: View {
             // pinned to the top at its natural height and starts scrolling only
             // when a short landscape height or large Dynamic Type sizes would
             // otherwise clip the chips or dial — and with them their tour anchors.
-            ScrollView(.vertical) {
-                MeterHUDCard(
-                    model: model,
-                    advisories: advisories,
-                    isTourActive: isTourActive,
-                    tourStep: tourStep
-                )
-                .frame(width: Self.drawerWidth)
+            ScrollViewReader { proxy in
+                ScrollView(.vertical) {
+                    MeterHUDCard(
+                        model: model,
+                        advisories: advisories,
+                        isTourActive: isTourActive,
+                        tourStep: tourStep
+                    )
+                    .frame(width: Self.drawerWidth)
+                }
+                .scrollBounceBehavior(.basedOnSize)
+                .scrollIndicators(.hidden)
+                // When the drawer scrolls, reveal the active guided-tour control so
+                // its spotlight never lands off-screen. A no-op when the content
+                // fits; `initial` also handles rotating into landscape mid-tour.
+                .onChange(of: tourStep, initial: true) {
+                    revealTourTarget(with: proxy)
+                }
             }
-            .scrollBounceBehavior(.basedOnSize)
-            .scrollIndicators(.hidden)
             .frame(width: Self.drawerWidth)
             // Full-height drawer: the content scrolls inside the safe area while
             // the two-corner surface fills the height and bleeds out past the
             // trailing / top / bottom safe areas to the physical edges.
             .docked(edge: .trailing)
+        }
+    }
+
+    /// Scrolls the drawer to the row holding the active step's tour anchor. Respects
+    /// Reduce Motion by jumping without an animated sweep.
+    private func revealTourTarget(with proxy: ScrollViewProxy) {
+        guard let step = tourStep,
+              let target = MeterHUDCard.scrollTarget(for: step) else { return }
+        if reduceMotion {
+            proxy.scrollTo(target, anchor: .center)
+        } else {
+            withAnimation(.snappy) { proxy.scrollTo(target, anchor: .center) }
         }
     }
 }
