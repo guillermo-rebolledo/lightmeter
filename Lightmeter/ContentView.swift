@@ -55,6 +55,11 @@ struct ContentView: View {
                     )
                     .ignoresSafeArea()
                     meterLayout
+                    // The occasional controls live over the preview in the
+                    // top-left — mirroring the settings gear opposite them —
+                    // rather than inside the HUD card, so both states are
+                    // always readable and the card stays clear.
+                    statusPills
                 case .denied:
                     CameraStatusView(status: .denied)
                 case .unavailable:
@@ -170,28 +175,41 @@ struct ContentView: View {
         let advisories = tourAdvisories ?? model.advisories
 
         Group {
-            // Both layouts compose the same shared control strip, so both take
-            // the tour step; only drive the strip's tour override while the tour
-            // is actually presented, otherwise the strip stays view-local.
-            let tourStep = tour.isPresented ? tour.currentStep : nil
-
             if isLandscape {
                 LandscapeMeterLayout(
                     model: model,
                     advisories: advisories,
                     isTourActive: tour.isPresented,
-                    tourStep: tourStep
+                    tourStep: activeTourStep
                 )
             } else {
                 PortraitMeterLayout(
                     model: model,
                     advisories: advisories,
-                    isTourActive: tour.isPresented,
-                    tourStep: tourStep
+                    isTourActive: tour.isPresented
                 )
             }
         }
         .animation(reduceMotion ? nil : .smooth, value: verticalSizeClass)
+    }
+
+    /// The metering pattern and compensation status pills, floated over the
+    /// preview in the top-left — the mirror of the settings gear opposite them.
+    /// Owned here rather than by either layout so the pair sits in the same place
+    /// in both orientations (the landscape drawer hugs the trailing edge, leaving
+    /// the leading corner clear).
+    private var statusPills: some View {
+        MeterStatusPills(model: model, tourStep: activeTourStep)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(.top, 4)
+            .padding(.leading, 8)
+    }
+
+    /// The step the tour is actually showing — only drive the pills' tour
+    /// override while the tour is presented, otherwise their reveal stays purely
+    /// view-local.
+    private var activeTourStep: GuidedTourStep? {
+        tour.isPresented ? tour.currentStep : nil
     }
 
     private func showTour() {

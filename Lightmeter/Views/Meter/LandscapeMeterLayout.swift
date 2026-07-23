@@ -21,8 +21,8 @@ struct LandscapeMeterLayout: View {
     /// The advisories snapshot to display — frozen while the tour runs.
     let advisories: [ExposureAdvisory]
     let isTourActive: Bool
-    /// The guided tour's current step, forwarded to the shared card's control
-    /// strip so it can force-open the section the active step targets.
+    /// The guided tour's current step — used to scroll the drawer to the row
+    /// holding the active step's anchor when the content is tall enough to scroll.
     var tourStep: GuidedTourStep?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -47,8 +47,7 @@ struct LandscapeMeterLayout: View {
                     MeterHUDCard(
                         model: model,
                         advisories: advisories,
-                        isTourActive: isTourActive,
-                        tourStep: tourStep
+                        isTourActive: isTourActive
                     )
                     .frame(width: Self.drawerWidth)
                 }

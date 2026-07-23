@@ -40,7 +40,7 @@ struct FreezeButton: View {
                 // open and closed glyphs are not the same width.
                 .frame(width: diameter, height: diameter)
                 // `glassEffect` contributes no hit region, so pin the tappable
-                // area to the full circle (matching the strip buttons and gear).
+                // area to the full circle (matching the status pills and gear).
                 .contentShape(.circle)
                 .modifier(GlassLockBackground(isHeld: isFrozen))
         }
