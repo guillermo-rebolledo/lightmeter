@@ -50,6 +50,25 @@ struct SolvedLegReadoutTests {
         #expect(readout(mode: .shutterPriority, iso: 800).caption == "Aperture @ ISO 800")
     }
 
+    // MARK: - VoiceOver
+
+    /// The hero names the leg it is answering for, so VoiceOver hears the same
+    /// thing the caption shows: the label is the caption, unabbreviated.
+    @Test func theHeroSpeaksTheLegItIsAnsweringFor() {
+        #expect(readout(mode: .aperturePriority).accessibilityLabel == "Shutter @ ISO 100")
+        #expect(readout(mode: .shutterPriority).accessibilityLabel == "Aperture @ ISO 100")
+    }
+
+    /// The em-dash placeholder is meaningless read aloud, so the pending hero
+    /// says it is pending rather than voicing a dash — or, worse, nothing.
+    @Test func thePendingHeroSaysPendingRatherThanVoicingTheDash() {
+        let pending = readout(mode: .aperturePriority, evAtISO100: nil)
+
+        #expect(pending.accessibilityValue == "Pending")
+        #expect(pending.accessibilityValue.contains(ExposureTriangle.pendingMarking) == false)
+        #expect(readout(mode: .aperturePriority).accessibilityValue == "1/125")
+    }
+
     /// Before the first reading the solved leg is pending, so the hero has no
     /// value to show — the view renders the placeholder rather than a stale one.
     @Test func heroHasNoValueBeforeTheFirstReading() {

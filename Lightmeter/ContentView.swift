@@ -19,6 +19,20 @@ struct ContentView: View {
     /// Advisories frozen for the tour's lifetime so their height cannot drift.
     @State private var tourAdvisories: [ExposureAdvisory]?
 
+    /// The guided tour's steps on this branch: **none**.
+    ///
+    /// The portrait usability variant is judged cold — we want to observe whether
+    /// the new arrangement (solved-leg hero, padlock, marked chips, top-left pills)
+    /// is discoverable without hand-holding, so the tour is disabled branch-only.
+    /// Handing the controller no steps makes it present nothing: the overlay never
+    /// renders and the meter UI is never covered, in either orientation and from
+    /// Settings' replay as well.
+    ///
+    /// Named rather than inlined so the "off" state is a fact a test can pin. The
+    /// tour's rewrite for the new controls is a separate follow-up, conditional on
+    /// the variant winning; restoring it is a one-line change here.
+    static let guidedTourSteps: [GuidedTourStep] = []
+
     init(defaults: UserDefaults = .standard) {
         let camera = CameraLightSource()
         let preferences = MeterPreferences(defaults: defaults)
@@ -26,15 +40,11 @@ struct ContentView: View {
         _camera = State(initialValue: camera)
         _model = State(initialValue: model)
         _preferences = State(initialValue: preferences)
-        // Portrait usability variant: the guided tour is disabled branch-only so
-        // we can observe whether the new arrangement is discoverable cold. Handing
-        // the controller no steps makes it present nothing — the overlay never
-        // renders and the meter UI is never covered.
         _tour = State(
             initialValue: GuidedTourController(
                 preferences: preferences,
                 model: model,
-                steps: []
+                steps: Self.guidedTourSteps
             )
         )
     }

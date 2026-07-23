@@ -28,7 +28,10 @@ struct AdvisoriesView: View {
             Image(systemName: primary.systemImage)
         }
         .font(.caption)
-        .foregroundStyle(.yellow)
+        // The single accent token, not a second hardcoded colour: the advisory
+        // line sits inside the same card as the hero, chips, and padlock, so a
+        // stray literal here is exactly the drift the token exists to prevent.
+        .foregroundStyle(Color.appAccent)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Exposure warnings: " + messages.joined(separator: ", "))
@@ -40,7 +43,7 @@ struct AdvisoriesView: View {
             ForEach(advisories, id: \.self) { advisory in
                 Label(advisory.message, systemImage: advisory.systemImage)
                     .font(.footnote.bold())
-                    .foregroundStyle(.yellow)
+                    .foregroundStyle(Color.appAccent)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityLabel("Exposure warning: \(advisory.message)")
             }
