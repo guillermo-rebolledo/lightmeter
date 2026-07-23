@@ -61,7 +61,7 @@ struct MeteringPatternToggle: View {
                 MeteringPatternToggle(pattern: pattern, onSelect: { pattern = $0 })
                     .frame(width: 260)
             }
-            .tint(.yellow)
+            .tint(.appAccent)
             .preferredColorScheme(.dark)
         }
     }

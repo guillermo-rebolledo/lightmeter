@@ -269,7 +269,7 @@ private extension Array {
                     )
                 }
             }
-            .tint(.yellow)
+            .tint(.appAccent)
             .preferredColorScheme(.dark)
         }
     }

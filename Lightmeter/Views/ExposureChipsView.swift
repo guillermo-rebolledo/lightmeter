@@ -193,6 +193,6 @@ private struct ValueChip: View {
         )
         .padding()
     }
-    .tint(.yellow)
+    .tint(.appAccent)
     .preferredColorScheme(.dark)
 }

@@ -48,6 +48,6 @@ struct FreezeButton: View {
         FreezeButton(isFrozen: true, canFreeze: true, onToggle: {})
             .padding()
     }
-    .tint(.yellow)
+    .tint(.appAccent)
     .preferredColorScheme(.dark)
 }

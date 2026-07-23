@@ -26,10 +26,15 @@ struct ContentView: View {
         _camera = State(initialValue: camera)
         _model = State(initialValue: model)
         _preferences = State(initialValue: preferences)
+        // Portrait usability variant: the guided tour is disabled branch-only so
+        // we can observe whether the new arrangement is discoverable cold. Handing
+        // the controller no steps makes it present nothing — the overlay never
+        // renders and the meter UI is never covered.
         _tour = State(
             initialValue: GuidedTourController(
                 preferences: preferences,
-                model: model
+                model: model,
+                steps: []
             )
         )
     }
@@ -72,7 +77,7 @@ struct ContentView: View {
                         .modifier(GlassCircleBackground())
                 }
                 .buttonStyle(.plain)
-                .tint(.yellow)
+                .tint(.appAccent)
                 .guidedTourAnchor(.settings)
                 .padding(.top, 4)
                 // In landscape the HUD drawer hugs the trailing edge; inset the
@@ -137,7 +142,7 @@ struct ContentView: View {
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
-            .tint(.yellow)
+            .tint(.appAccent)
             .task { await model.start() }
             .onDisappear { model.stop() }
         }
