@@ -501,6 +501,74 @@ struct MeterViewModelTests {
         #expect(vm.boundComponent == .shutter)
     }
 
+    // MARK: - Tap-to-claim (chips are the priority control)
+
+    /// Tapping the AUTO (solved) leg claims priority for it: the mode flips so the
+    /// tapped leg becomes editable, the dial re-binds to it, and the previously
+    /// controlled leg becomes the new solved/AUTO leg. Aperture-priority solves the
+    /// shutter, so claiming the shutter switches to shutter-priority.
+    @Test func claimingTheSolvedLegFlipsPriorityAndRebindsTheDial() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        #expect(vm.triangle.solved == .shutter)
+        #expect(vm.boundComponent == .aperture)
+
+        vm.claimPriority(for: .shutter)
+
+        #expect(vm.mode == .shutterPriority)
+        #expect(vm.triangle.solved == .aperture)
+        #expect(vm.isEditable(.shutter))
+        #expect(vm.boundComponent == .shutter)
+    }
+
+    /// The reverse claim: in shutter-priority the aperture is solved, so claiming
+    /// the aperture returns to aperture-priority with the dial back on the aperture.
+    @Test func claimingBackReturnsToAperturePriority() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        vm.setMode(.shutterPriority)
+        #expect(vm.triangle.solved == .aperture)
+
+        vm.claimPriority(for: .aperture)
+
+        #expect(vm.mode == .aperturePriority)
+        #expect(vm.boundComponent == .aperture)
+    }
+
+    /// ISO is always an input and never solved, so no mode can lock it — claiming
+    /// it is a no-op that leaves the mode and dial binding untouched.
+    @Test func claimingISOIsANoOp() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        vm.claimPriority(for: .iso)
+        #expect(vm.mode == .aperturePriority)
+        #expect(vm.boundComponent == .aperture)
+    }
+
+    /// `selectChip` routes a tap on an editable leg to a dial bind: tapping the
+    /// editable ISO chip moves the dial to ISO without touching the mode.
+    @Test func selectingAnEditableChipBindsTheDial() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        vm.selectChip(.iso)
+        #expect(vm.boundComponent == .iso)
+        #expect(vm.mode == .aperturePriority)
+    }
+
+    /// `selectChip` routes a tap on the AUTO leg to a priority claim: tapping the
+    /// solved shutter flips to shutter-priority and binds the dial to the shutter.
+    @Test func selectingTheAUTOChipClaimsPriority() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        vm.selectChip(.shutter) // shutter is solved (AUTO) in aperture-priority
+        #expect(vm.mode == .shutterPriority)
+        #expect(vm.boundComponent == .shutter)
+    }
+
+    /// Tapping the already-bound priority leg via `selectChip` is a no-op bind: the
+    /// leg stays editable and bound, and the mode is unchanged.
+    @Test func selectingTheBoundLegKeepsItBound() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        vm.selectChip(.aperture) // aperture is the bound priority leg
+        #expect(vm.boundComponent == .aperture)
+        #expect(vm.mode == .aperturePriority)
+    }
+
     // MARK: - Metering pattern
 
     /// Center-weighted average is the default: no spot is placed, and the source

@@ -264,6 +264,29 @@ final class MeterViewModel {
         setMode(mode.toggled)
     }
 
+    /// Tap-to-claim on an AUTO (solved) chip: makes `component` the priority leg
+    /// the photographer controls, by switching to the mode that locks it. The dial
+    /// re-binds to `component` (via `setMode`) and the previously-locked leg becomes
+    /// the new solved/AUTO leg. ISO is always an input and never solved, so no mode
+    /// can lock it — claiming it is a no-op.
+    func claimPriority(for component: ExposureComponent) {
+        guard let claimed = PriorityMode.locking(component) else { return }
+        setMode(claimed)
+    }
+
+    /// Handles a tap on an exposure chip. An editable (set) leg binds the ruler
+    /// dial to it; the AUTO (solved) leg claims priority — flipping the mode so it
+    /// becomes the leg the photographer controls and the other leg goes to AUTO.
+    /// The single entry point the chips call, so a chip never needs to know which
+    /// of the two actions its current role maps to.
+    func selectChip(_ component: ExposureComponent) {
+        if isEditable(component) {
+            bindDial(to: component)
+        } else {
+            claimPriority(for: component)
+        }
+    }
+
     // MARK: - Metering pattern
 
     /// Switches the metering pattern and routes the resulting region of interest

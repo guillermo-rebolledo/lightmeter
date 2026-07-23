@@ -1,9 +1,9 @@
 import SwiftUI
 
 /// The metering-pattern control: a two-segment glass pill that switches between a
-/// center-weighted whole-frame average and a tap-placed spot. Mirrors
-/// `PriorityModeToggle` — the selected segment carries an accent-tinted highlight
-/// that slides between the two. Selecting the already-active segment is a no-op.
+/// center-weighted whole-frame average and a tap-placed spot. The selected segment
+/// carries an accent-tinted highlight that slides between the two. Selecting the
+/// already-active segment is a no-op.
 struct MeteringPatternToggle: View {
     /// The active metering pattern — the segment shown as selected.
     let pattern: MeteringPattern

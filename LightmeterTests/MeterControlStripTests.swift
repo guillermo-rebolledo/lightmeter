@@ -2,9 +2,9 @@ import Testing
 @testable import Lightmeter
 
 /// The one piece of real logic in the inline control strip: which strip section
-/// the guided tour force-opens for a given step, so the `.compensation`,
-/// `.meteringPattern`, and priority controls the strip hides in ordinary use
-/// still resolve their tour anchors when their step is active.
+/// the guided tour force-opens for a given step, so the `.compensation` and
+/// `.meteringPattern` controls the strip hides in ordinary use still resolve their
+/// tour anchors when their step is active.
 struct MeterControlStripTests {
     @Test func compensationStepOpensCompensation() {
         #expect(MeterControlStrip.tourSection(for: .compensation) == .compensation)
@@ -14,8 +14,11 @@ struct MeterControlStripTests {
         #expect(MeterControlStrip.tourSection(for: .meteringPattern) == .pattern)
     }
 
-    @Test func priorityStepOpensPriority() {
-        #expect(MeterControlStrip.tourSection(for: .priorityAndChips) == .priority)
+    /// The priority step now teaches tap-to-claim on the persistent chips, whose
+    /// anchor resolves without revealing anything — so the strip force-opens no
+    /// section for it (there is no priority section anymore).
+    @Test func priorityStepForcesNothingOpen() {
+        #expect(MeterControlStrip.tourSection(for: .priorityAndChips) == nil)
     }
 
     @Test func persistentStepsForceNothingOpen() {

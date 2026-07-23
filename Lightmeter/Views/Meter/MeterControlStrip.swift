@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// The occasional exposure controls — compensation, metering pattern, and
-/// priority mode — lifted out of the persistent compact card into an inline
-/// expanding strip. A compact row of icon buttons sits above the chips; tapping
+/// The occasional exposure controls — compensation and metering pattern — lifted
+/// out of the persistent compact card into an inline expanding strip. Priority is
+/// no longer here: the exposure chips are the priority control now, claimed by
+/// tapping the AUTO leg. A compact row of icon buttons sits above the chips; tapping
 /// one reveals that control inline, in a small attached surface that grows the
 /// card slightly rather than covering the frame with a large panel. Exactly one
 /// section is open at a time — opening one collapses any other.
@@ -31,18 +32,18 @@ struct MeterControlStrip: View {
     enum Section: Hashable {
         case compensation
         case pattern
-        case priority
     }
 
     /// The strip section the guided tour force-opens for `step`, or `nil` for
     /// steps whose control stays in the persistent layout (or when no tour runs).
-    /// Pure and exhaustive so a new step can't silently fall through.
+    /// Pure and exhaustive so a new step can't silently fall through. The priority
+    /// step (`.priorityAndChips`) forces nothing open now — its control is the
+    /// persistent chips, whose anchor resolves without revealing anything.
     static func tourSection(for step: GuidedTourStep?) -> Section? {
         switch step {
         case .meteringPattern: .pattern
         case .compensation: .compensation
-        case .priorityAndChips: .priority
-        case .welcome, .evReadout, .dial, .settings, .none: nil
+        case .welcome, .evReadout, .priorityAndChips, .dial, .settings, .none: nil
         }
     }
 
@@ -83,12 +84,6 @@ struct MeterControlStrip: View {
                 systemImage: model.pattern.systemImage,
                 label: "Metering pattern",
                 value: model.pattern.label
-            )
-            iconButton(
-                .priority,
-                systemImage: "camera.aperture",
-                label: "Priority mode",
-                value: model.mode.label
             )
         }
     }
@@ -151,13 +146,6 @@ struct MeterControlStrip: View {
                 onSelect: { model.setPattern($0) }
             )
             .guidedTourAnchor(.meteringPattern)
-        case .priority:
-            // The `.priorityAndChips` tour anchor lives on the persistent chips,
-            // so the revealed toggle carries no anchor of its own.
-            PriorityModeToggle(
-                mode: model.mode,
-                onSelect: { model.setMode($0) }
-            )
         }
     }
 }

@@ -55,7 +55,7 @@ struct MeterHUDCard: View {
             ExposureChipsView(
                 triangle: model.triangle,
                 boundComponent: model.boundComponent,
-                onSelect: { model.bindDial(to: $0) }
+                onSelect: { model.selectChip($0) }
             )
             .guidedTourAnchor(.priorityAndChips)
             .id(GuidedTourStep.priorityAndChips)
