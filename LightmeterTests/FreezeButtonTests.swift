@@ -34,14 +34,27 @@ struct FreezeButtonTests {
 
     // MARK: - VoiceOver
 
-    /// The padlock is silent to VoiceOver as a glyph, so both the action and the
-    /// current state have to ride on the label and hint.
-    @Test func eachStateNamesTheActionAndTheStateItIsIn() {
+    /// The padlock is silent to VoiceOver as a glyph, so the action rides on the
+    /// label.
+    @Test func eachStateNamesTheActionTheTapPerforms() {
         #expect(FreezeButton.LockState.live.accessibilityLabel == "Hold current reading")
         #expect(FreezeButton.LockState.held.accessibilityLabel == "Resume live metering")
+    }
 
+    /// …and the open/closed state sighted users read off the glyph is spoken as
+    /// the value, so it isn't left to be inferred from the action's wording.
+    @Test func eachStateReportsWhetherTheReadingIsHeld() {
+        #expect(FreezeButton.LockState.live.accessibilityValue == "Live metering")
+        #expect(FreezeButton.LockState.held.accessibilityValue == "Reading held")
+    }
+
+    /// Every state says something in every slot, and no two states say the same
+    /// thing — a hint that didn't change with the state would mislead.
+    @Test func neitherStateLeavesAVoiceOverSlotEmptyOrAmbiguous() {
         for state in [FreezeButton.LockState.live, .held] {
             #expect(state.accessibilityHint.isEmpty == false)
+            #expect(state.accessibilityValue.isEmpty == false)
+            #expect(state.accessibilityLabel.isEmpty == false)
         }
         #expect(FreezeButton.LockState.live.accessibilityHint != FreezeButton.LockState.held.accessibilityHint)
     }

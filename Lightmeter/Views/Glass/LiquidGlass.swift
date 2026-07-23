@@ -85,7 +85,7 @@ struct GlassLockBackground: ViewModifier {
         if #available(iOS 26, *) {
             content.glassEffect(.regular.interactive(), in: .circle)
         } else {
-            content.background(.white.opacity(0.08), in: Circle())
+            content.background(.white.opacity(0.08), in: .circle)
         }
     }
 }

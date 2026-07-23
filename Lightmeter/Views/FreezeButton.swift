@@ -16,31 +16,39 @@ struct FreezeButton: View {
     let canFreeze: Bool
     let onToggle: () -> Void
 
+    /// Apple's 44pt minimum tap target, scaled with Dynamic Type alongside the
+    /// glyph it holds. Identical in both states, so freezing is a pure repaint.
+    @ScaledMetric(relativeTo: .body) private var diameter: Double = 44
+
     private var lock: LockState { LockState(isFrozen: isFrozen) }
 
     var body: some View {
         Button(action: onToggle) {
-            Image(systemName: lock.symbol)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.tint)
+            // A titled `Label` rather than a bare `Image`, so the padlock's
+            // action reaches Voice Control and the accessibility label can't
+            // drift from the button it names.
+            Label(lock.accessibilityLabel, systemImage: lock.symbol)
+                .labelStyle(.iconOnly)
+                .font(.body.weight(.semibold))
+                // `.tint` is not dimmed by the disabled environment the way an
+                // inherited foreground is, so the unavailable state is drawn
+                // explicitly — otherwise a padlock that does nothing before the
+                // first reading would look fully live.
+                .foregroundStyle(.tint.opacity(canFreeze ? 1 : 0.35))
                 // The glyph swap must not move the hero it sits beside, so the
                 // padlock is sized by its frame rather than by the symbol: the
                 // open and closed glyphs are not the same width.
-                .frame(width: Self.diameter, height: Self.diameter)
+                .frame(width: diameter, height: diameter)
                 // `glassEffect` contributes no hit region, so pin the tappable
                 // area to the full circle (matching the strip buttons and gear).
-                .contentShape(Circle())
+                .contentShape(.circle)
                 .modifier(GlassLockBackground(isHeld: isFrozen))
         }
         .buttonStyle(.plain)
         .disabled(canFreeze == false)
-        .accessibilityLabel(lock.accessibilityLabel)
+        .accessibilityValue(lock.accessibilityValue)
         .accessibilityHint(lock.accessibilityHint)
     }
-
-    /// The circle's diameter — Apple's 44pt minimum tap target, held constant
-    /// across both states so freezing is a pure repaint.
-    static let diameter: CGFloat = 44
 }
 
 extension FreezeButton {
@@ -66,11 +74,20 @@ extension FreezeButton {
         }
 
         /// The padlock is silent to VoiceOver as a glyph, so the label names the
-        /// action the tap performs and the hint says what that leaves you in.
+        /// action the tap performs, the value reports the state the open/closed
+        /// glyph shows sighted users, and the hint says what the tap leaves you
+        /// in.
         var accessibilityLabel: String {
             switch self {
             case .live: "Hold current reading"
             case .held: "Resume live metering"
+            }
+        }
+
+        var accessibilityValue: String {
+            switch self {
+            case .live: "Live metering"
+            case .held: "Reading held"
             }
         }
 
