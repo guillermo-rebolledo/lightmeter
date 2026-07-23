@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The metering HUD's content column, shared by both orientations: a demoted
-/// freeze icon beside a smaller EV readout, a thin advisory line, the inline
+/// freeze icon beside the solved-leg hero, a thin advisory line, the inline
 /// expanding control strip (compensation, pattern, priority), the exposure-triangle
 /// chips, and — folded in below them in *both* orientations now — the horizontal
 /// ruler dial.
@@ -32,10 +32,10 @@ struct MeterHUDCard: View {
             // Freeze is demoted to a small icon floated on the trailing edge as
             // an overlay, so the readout centers across the full width with no
             // mirrored empty slot opening a gap across the row. The readout's
-            // widest element is the fixed "EV @ ISO 100" caption (~100pt); centered
+            // widest element is its caption ("Shutter @ ISO 100", ~130pt); centered
             // on even the narrowest iPhone card it clears the 44pt trailing icon by
-            // a wide margin, so the overlay never collides with it.
-            EVReadoutView(ev: model.ev, isCompact: true)
+            // a comfortable margin, so the overlay never collides with it.
+            SolvedLegReadoutView(triangle: model.triangle, isCompact: true)
                 .frame(maxWidth: .infinity)
                 .overlay(alignment: .trailing) {
                     FreezeButton(
