@@ -229,10 +229,11 @@ struct ContentView: View {
             .padding(.top, statusPillRowHeight + 12)
     }
 
-    /// The status pills' tappable row height — what the EV label clears. Scaled
-    /// with Dynamic Type alongside the pills' own footnote text, so the label
-    /// doesn't slide up into a row that grew.
-    @ScaledMetric(relativeTo: .footnote) private var statusPillRowHeight: CGFloat = 44
+    /// The status pills' own row height — what the EV label clears — scaled with
+    /// Dynamic Type alongside the pills' footnote text, so the label doesn't
+    /// slide up into a row that grew.
+    @ScaledMetric(relativeTo: .footnote)
+    private var statusPillRowHeight: CGFloat = MeterStatusPills.rowHeight
 
     /// The step the tour is actually showing — only drive the pills' tour
     /// override while the tour is presented, otherwise their reveal stays purely

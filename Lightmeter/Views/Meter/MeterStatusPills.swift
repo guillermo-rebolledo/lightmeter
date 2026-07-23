@@ -70,6 +70,12 @@ struct MeterStatusPills: View {
         }
     }
 
+    /// The pills' row height — the 44pt tap-target minimum, and the single
+    /// source anything laid out *beneath* the floating pair clears itself of
+    /// (the preview's EV label does), so the row's height can't drift away from
+    /// what its neighbours assume.
+    static let rowHeight: CGFloat = 44
+
     /// The editor the guided tour force-opens for `step`, or `nil` for steps whose
     /// control stays in the persistent layout (and when no tour runs). Pure and
     /// exhaustive so a new step can't silently fall through.
@@ -199,9 +205,9 @@ struct MeterStatusPill: View {
             }
             .font(.footnote.weight(.semibold))
             .padding(.horizontal, 12)
-            // A minimal pill that is still a real target: the 44pt minimum is
-            // held by the frame, not by fattening the visible capsule.
-            .frame(minHeight: 44)
+            // A minimal pill that is still a real target: the minimum is held by
+            // the frame, not by fattening the visible capsule.
+            .frame(minHeight: MeterStatusPills.rowHeight)
             // `glassEffect` (unlike `background`) contributes no hit region, so
             // pin the tappable area to the whole capsule — the same explicit
             // content shape the settings gear and the chips carry.

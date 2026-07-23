@@ -265,14 +265,18 @@ private final class ReticleView: UIView {
     /// Shows `readout`'s EV inline under the bracket, or hides the badge when
     /// there is no reading to attribute to this point.
     func showBadge(_ readout: PreviewEVReadout?) {
-        guard let value = readout?.badgeValue else {
+        guard let readout, let value = readout.badgeValue else {
             badge.isHidden = true
             return
         }
         badge.isHidden = false
         badge.text = value
-        badge.accessibilityLabel = readout?.accessibilityLabel
-        badge.accessibilityValue = readout?.accessibilityValue
+        // Named and valued explicitly: read as its own text the badge would say
+        // "E V 12.3" with no hint of *which* read it describes. The reticle
+        // itself stays silent — it is decoration around this element.
+        badge.isAccessibilityElement = true
+        badge.accessibilityLabel = readout.accessibilityLabel
+        badge.accessibilityValue = readout.accessibilityValue
         setNeedsLayout()
     }
 
