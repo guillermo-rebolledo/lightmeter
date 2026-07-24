@@ -67,9 +67,10 @@ clever:
 
 ## The reference shots
 
-Today's meter screen under the harness, at the commit that introduced it —
-the baseline any variant is compared against. Regenerate them with the
-sequence below whenever the meter screen changes deliberately.
+Today's meter screen under the harness — the baseline any variant is compared
+against. Regenerate them with the sequence below whenever the meter screen
+changes deliberately. Last regenerated for the brass accent and the monospaced
+numeric face (#95, ADR-0003).
 
 | `blown-sky` | `dim-interior` | `mixed-contrast` |
 | --- | --- | --- |
@@ -182,6 +183,23 @@ xcrun simctl launch "$UDID" "$BUNDLE_ID" -design-harness \
 sleep 3
 xcrun simctl io "$UDID" screenshot worst-case.png
 ```
+
+## Checking a text size
+
+The Simulator's content size is set from outside the app, so it composes with
+every state above rather than needing an argument of its own:
+
+```sh
+xcrun simctl ui "$UDID" content_size accessibility-extra-large   # accessibility3
+```
+
+The tiers the meter is checked at are `large` (the default),
+`accessibility-extra-large` (`accessibility3` — where
+`AppTypography.maximumDynamicTypeSize` holds), and
+`accessibility-extra-extra-extra-large` (`accessibility5` — which, because of
+that ceiling, should be indistinguishable from `accessibility3`). Set the size
+*before* launching; put it back with `content_size large` when you are done, or
+every later screenshot inherits it.
 
 ## Forcing the pre-iOS-26 fallback
 

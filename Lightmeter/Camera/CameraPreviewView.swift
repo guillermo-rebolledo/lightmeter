@@ -352,14 +352,14 @@ private final class ReticleBadgeLabel: UILabel {
         layer.cornerRadius = bounds.height / 2
     }
 
-    /// The meter's rounded, monospaced-digit face, scaled with Dynamic Type but
-    /// capped: the badge annotates a point in the frame, so at the accessibility
-    /// sizes it grows to stay readable without covering the scene it describes.
-    private static let badgeFont: UIFont = {
-        let base = UIFont.monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
-        let rounded = base.fontDescriptor.withDesign(.rounded)
-            .map { UIFont(descriptor: $0, size: base.pointSize) } ?? base
-        return UIFontMetrics(forTextStyle: .caption1)
-            .scaledFont(for: rounded, maximumPointSize: 22)
-    }()
+    /// The meter's numeric face, scaled with Dynamic Type but capped: the badge
+    /// annotates a point in the frame, so at the accessibility sizes it grows to
+    /// stay readable without covering the scene it describes. Read from the same
+    /// token the SwiftUI readouts do, so the badge cannot be the one number on
+    /// screen still wearing the old face.
+    private static let badgeFont = AppTypography.numeralFont(
+        fixedSize: 13,
+        relativeTo: .caption1,
+        maximumPointSize: 22
+    )
 }

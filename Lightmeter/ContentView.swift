@@ -118,6 +118,15 @@ struct ContentView: View {
                 // never disappears beneath the drawer.
                 .padding(.trailing, isLandscape ? LandscapeMeterLayout.drawerWidth + 8 : 8)
             }
+            // One declaration for the whole meter screen — the HUD, the floating
+            // pills, and the gear that sits opposite them — which is what makes
+            // landscape inherit the ceiling rather than implement it again.
+            // Applied here rather than on the switch above so the gear is capped
+            // with everything else: it is a 44pt target over the preview, and an
+            // accessibility size grew its glyph until it overlapped the pills.
+            // Settings is pushed as its own destination, so it keeps the full
+            // Dynamic Type range — it is an ordinary scrolling list with room.
+            .meterTextScaling()
             // Resolve tour anchors in the same full-screen space the spotlight
             // draws into. An outer overlay under-reports Y by the top safe area,
             // which shifts every cutout upward by roughly one control row.

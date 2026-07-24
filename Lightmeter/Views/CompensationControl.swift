@@ -16,9 +16,12 @@ struct CompensationControl: View {
                     .foregroundStyle(.secondary)
 
                 Text(value)
-                    .font(.footnote.bold().monospacedDigit())
+                    .font(AppTypography.numeral(.footnote, weight: .bold))
                     .foregroundStyle(isBound ? AnyShapeStyle(.tint) : AnyShapeStyle(.white))
                     .contentTransition(.numericText())
+                    // "+1.0 EV" in a monospaced face is wider than it was, and
+                    // the capsule is the fixed-width half of a revealed editor.
+                    .scaledToFitOnOneLine(minimumScale: 0.7)
             }
             .frame(maxWidth: .infinity, minHeight: 44)
             .background(

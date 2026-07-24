@@ -343,7 +343,7 @@ extension View {
 /// or Dynamic Island.
 ///
 /// A darkening scrim sits *behind the drawer content but in front of the glass /
-/// material* on both paths, so the white / `.secondary` / `.yellow` HUD text keeps
+/// material* on both paths, so the white / `.secondary` / accented HUD text keeps
 /// its contrast even over a blown-out sky where the translucent surface alone would
 /// wash out. It is gated the same way the glass is: a light scrim under Liquid
 /// Glass — enough to guarantee legibility while preserving the refracting look —

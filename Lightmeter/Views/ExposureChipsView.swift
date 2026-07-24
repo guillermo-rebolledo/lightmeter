@@ -103,8 +103,9 @@ struct ExposureChipsView: View {
     }
 
     /// The size the marking slot occupies in every chip, glyph or no glyph. Reserved
-    /// unconditionally so a role change is a pure repaint.
-    static let markingSlotSize = CGSize(width: 11, height: 12)
+    /// unconditionally so a role change is a pure repaint. Sized to hold the padlock
+    /// at the label floor, which is what it grew to when the 9pt glyph was raised.
+    static let markingSlotSize = CGSize(width: 13, height: 13)
 }
 
 /// A single exposure-triangle chip: a caption over a value, styled by its role.
@@ -150,17 +151,15 @@ struct ExposureValueChip: View {
                     .textCase(.uppercase)
                     .tracking(1)
                     .foregroundStyle(captionStyle)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .scaledToFitOnOneLine(minimumScale: 0.7)
                 markingSlot
             }
 
             Text(value)
-                .font(.title3.weight(.semibold).monospacedDigit())
+                .font(AppTypography.numeral(.title3))
                 .contentTransition(.numericText())
                 .foregroundStyle(valueStyle)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
+                .scaledToFitOnOneLine()
         }
         .padding(.vertical, 11)
         .padding(.horizontal, 8)
@@ -187,7 +186,10 @@ struct ExposureValueChip: View {
             .overlay {
                 if let symbol = role.markingSymbol {
                     Image(systemName: symbol)
-                        .font(.system(size: 9, weight: .bold))
+                        // The padlock is read, not decoration — it is the only
+                        // thing saying which leg is held — so it sits at the
+                        // label floor rather than below it.
+                        .font(.system(size: AppTypography.labelFloorPointSize, weight: .bold))
                         .foregroundStyle(.tint)
                 }
             }

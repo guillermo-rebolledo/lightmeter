@@ -24,7 +24,7 @@ struct GuidedTourOverlay: View {
             VStack {
                 HStack {
                     Text(progressLabel)
-                        .font(.subheadline.monospacedDigit())
+                        .font(AppTypography.numeral(.subheadline, weight: .regular))
                         .foregroundStyle(.white)
                         .allowsHitTesting(false)
 

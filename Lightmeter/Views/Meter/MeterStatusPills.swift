@@ -53,6 +53,17 @@ struct MeterStatusPills: View {
             }
         }
 
+        /// Whether the pill's value is a number, and so wears the numeric face.
+        /// Compensation is a live-updating figure that has to hold still as it
+        /// steps; the pattern pill says "Average" or "Spot", and a word set in a
+        /// monospaced face reads as a typewriter rather than as an instrument.
+        var valueIsNumeric: Bool {
+            switch self {
+            case .pattern: false
+            case .compensation: true
+            }
+        }
+
         /// The glyph on the pill: the pattern pill wears the active pattern's own
         /// symbol, compensation the fixed plus-minus.
         @MainActor
@@ -196,12 +207,12 @@ struct MeterStatusPill: View {
                 Image(systemName: control.systemImage(in: model))
                     .foregroundStyle(.tint)
                 Text(control.value(in: model))
+                    .font(control.valueIsNumeric ? AppTypography.numeral(.footnote) : nil)
                     .foregroundStyle(isOpen ? AnyShapeStyle(.tint) : AnyShapeStyle(.white))
-                    .lineLimit(1)
                     // The pair sits over the preview with no card to grow into,
                     // so an accessibility text size shrinks the value rather than
                     // pushing the pills off the frame.
-                    .minimumScaleFactor(0.7)
+                    .scaledToFitOnOneLine(minimumScale: 0.7)
             }
             .font(.footnote.weight(.semibold))
             .padding(.horizontal, 12)
