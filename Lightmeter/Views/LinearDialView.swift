@@ -160,8 +160,15 @@ struct LinearDialView: View {
     /// so the ruler reads as ticks with one number rather than a wall of digits.
     private var selectedLabel: some View {
         Text(labels[safe: geometry.stop(at: position)] ?? "")
-            .font(.system(size: 19, weight: .semibold, design: .rounded))
-            .monospacedDigit()
+            // Fixed, like the hero: the label sits over a ruler whose ticks do
+            // not move, so growing it with Dynamic Type would only walk it off
+            // the marks it is naming.
+            .font(AppTypography.numeral(fixedSize: 19))
+            // …and, unlike the hero, it does not scale to fit. It is one short
+            // value alone above the full width of the ruler — the longest of them
+            // ("1/8000") is a fraction of that even in the wider monospaced face —
+            // so there is nothing to shrink away from, and `fixedSize` is what
+            // keeps the positioned label from being squeezed by its container.
             .fixedSize()
             .foregroundStyle(.tint)
             .animation(nil, value: position)

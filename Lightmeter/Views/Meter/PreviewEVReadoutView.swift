@@ -20,11 +20,10 @@ struct PreviewEVReadoutView: View {
     var body: some View {
         if let readout, let value = readout.secondaryValue {
             Text(value)
-                .font(.footnote.weight(.semibold))
-                .monospacedDigit()
+                .font(AppTypography.numeral(.footnote))
                 .foregroundStyle(.white)
                 .contentTransition(.numericText())
-                .lineLimit(1)
+                .scaledToFitOnOneLine(minimumScale: 0.7)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
                 // The label floats on the raw scene — a blown-out sky washes out

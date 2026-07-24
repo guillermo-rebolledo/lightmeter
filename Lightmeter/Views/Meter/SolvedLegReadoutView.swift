@@ -23,23 +23,36 @@ struct SolvedLegReadoutView: View {
     var body: some View {
         VStack(spacing: 2) {
             Text(readout.caption)
+                // The smallest tier in the app, and the floor the token names:
+                // `.caption2` is 11pt at the default text size.
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(.secondary)
                 .textCase(.uppercase)
                 .tracking(1.5)
+                // The caption's whole job is to say which ISO the answer below is
+                // the answer *for*, so a truncated "APERTURE @ ISO…" is a caption
+                // that has stopped working: the longest of them
+                // ("APERTURE @ ISO 12800") shrinks rather than losing its tail.
+                //
+                // This does not reach the *other* way that tail can go missing.
+                // At `accessibility3` on the glass path the caption runs under the
+                // freeze padlock and the drawer's surface clips it — the fallback
+                // path, same code and same scale factor, draws it in full. That is
+                // the glass container's clip, not text truncation, and it predates
+                // this change; it belongs to the layout ticket.
+                .scaledToFitOnOneLine(minimumScale: 0.7)
 
             Text(readout.value ?? ExposureTriangle.pendingMarking)
                 // Sized to the decluttered card both orientations now dock; the
                 // old readout's larger landscape variant had no caller left.
-                .font(.system(size: 34, weight: .semibold, design: .rounded))
-                .monospacedDigit()
+                // Fixed, because 34pt already outruns any Dynamic Type size.
+                .font(AppTypography.numeral(fixedSize: 34))
                 .foregroundStyle(.white)
                 .contentTransition(.numericText())
                 // Slow shutters ("1/8000", "30\"") are wider than the EV number
                 // this replaced, so the hero shrinks to fit rather than wrapping
                 // or truncating the answer.
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
+                .scaledToFitOnOneLine()
         }
         .animation(reduceMotion ? nil : .snappy, value: triangle)
         .accessibilityElement(children: .ignore)

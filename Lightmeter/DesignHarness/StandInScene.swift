@@ -328,7 +328,7 @@ private struct StandInReticle: View {
     @ViewBuilder private var badge: some View {
         if let readout, let value = readout.badgeValue {
             Text(value)
-                .font(.caption.weight(.semibold).monospacedDigit())
+                .font(AppTypography.numeral(.caption))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)

@@ -53,6 +53,17 @@ struct MeterStatusPills: View {
             }
         }
 
+        /// Whether the pill's value is a number, and so wears the numeric face.
+        /// Compensation is a live-updating figure that has to hold still as it
+        /// steps; the pattern pill says "Average" or "Spot", and a word set in a
+        /// monospaced face reads as a typewriter rather than as an instrument.
+        var valueIsNumeric: Bool {
+            switch self {
+            case .pattern: false
+            case .compensation: true
+            }
+        }
+
         /// The glyph on the pill: the pattern pill wears the active pattern's own
         /// symbol, compensation the fixed plus-minus.
         @MainActor
@@ -196,12 +207,21 @@ struct MeterStatusPill: View {
                 Image(systemName: control.systemImage(in: model))
                     .foregroundStyle(.tint)
                 Text(control.value(in: model))
+                    // Both branches name a font: `.font(nil)` does not fall
+                    // through to the row's font below, it clears the value's
+                    // font to the default body.
+                    .font(control.valueIsNumeric
+                        ? AppTypography.numeral(.footnote)
+                        : .footnote.weight(.semibold))
                     .foregroundStyle(isOpen ? AnyShapeStyle(.tint) : AnyShapeStyle(.white))
-                    .lineLimit(1)
+                    // Compensation steps live under the thumb, so it counts the
+                    // way every other numeric readout does. Inert on the pattern
+                    // pill, whose value is a word.
+                    .contentTransition(.numericText())
                     // The pair sits over the preview with no card to grow into,
                     // so an accessibility text size shrinks the value rather than
                     // pushing the pills off the frame.
-                    .minimumScaleFactor(0.7)
+                    .scaledToFitOnOneLine(minimumScale: 0.7)
             }
             .font(.footnote.weight(.semibold))
             .padding(.horizontal, 12)
