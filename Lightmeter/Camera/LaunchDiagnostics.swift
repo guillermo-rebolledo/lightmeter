@@ -62,12 +62,12 @@ enum LaunchDiagnostics {
     static let logger = Logger(subsystem: "com.lightmeter", category: "launch")
 
     /// A main-queue round trip slower than this counts as a stall worth logging —
-    /// past it the main thread was busy enough to have swallowed a touch. Tuned to
-    /// ~two dropped frames (33ms): the first on-device run showed no stall at the
-    /// 100ms floor, so the threshold is dropped here to catch a train of smaller
-    /// hitches that a coarse floor would hide, while still sitting well above the
-    /// sub-millisecond a probe lands in when the main thread is idle.
-    static let hangThreshold: CFTimeInterval = 0.033
+    /// past it the main thread was busy enough to drop a frame. Tuned to ~one
+    /// dropped frame (20ms): the 100ms then 33ms floors both came back clean on
+    /// device, so the floor is dropped again to catch a train of single-frame
+    /// hitches during camera startup that a coarser floor hides — while still well
+    /// above the sub-millisecond a probe lands in when the main thread is idle.
+    static let hangThreshold: CFTimeInterval = 0.02
 
     /// Whether a measured main-queue round-trip latency counts as a stall — the
     /// watchdog's decision, split out so the boundary is pinned by a test.
