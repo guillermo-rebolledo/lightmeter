@@ -45,8 +45,11 @@ struct PortraitMeterLayout: View {
 
             // The occasional controls, still floating over the preview but now
             // below the bar that took their corner. They keep their own surfaces:
-            // they are over the scene, not on the panel.
-            MeterStatusPills(model: model, tourStep: tourStep)
+            // they are over the scene, not on the panel. Compensation is no longer
+            // among them — #98 gave it a permanent draggable track in the dial
+            // panel and retired its pill — so only the metering-pattern pill floats
+            // here until #99 rehouses it into the segmented row.
+            MeterStatusPills(model: model, tourStep: tourStep, controls: [.pattern])
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Self.panelInset)
                 .padding(.top, 8)

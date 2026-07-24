@@ -51,11 +51,30 @@ struct MeterDialPanel: View {
         VStack(spacing: Self.rowSpacing) {
             headline
             MeterDialHost(model: model)
+            // The compensation track lives below a hairline, so it reads as a
+            // second instrument on the same panel rather than as part of the ruler
+            // above it — the dial turns a leg, this one nudges the whole exposure.
+            hairline
+            CompensationSliderView(
+                value: model.compensation,
+                label: model.compensationLabel,
+                onChange: { model.setCompensation($0) }
+            )
             MeterAdvisoryFooter(advisories: advisories, isTourActive: isTourActive)
         }
         .padding(.horizontal, Self.horizontalPadding)
         .padding(.vertical, Self.verticalPadding)
         .floatingPanel()
+    }
+
+    /// The rule separating the dial from the compensation track — a hairline the
+    /// width of the panel's content, so the two controls read as siblings under
+    /// one surface rather than one continuous scale.
+    private var hairline: some View {
+        Rectangle()
+            .fill(.white.opacity(0.12))
+            .frame(height: 1)
+            .accessibilityHidden(true)
     }
 
     /// What the dial is turning, and where it is now.

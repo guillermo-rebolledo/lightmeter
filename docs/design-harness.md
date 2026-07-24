@@ -69,11 +69,14 @@ clever:
 
 Today's meter screen under the harness — the baseline any variant is compared
 against. Regenerate them with the sequence below whenever the meter screen
-changes deliberately. Last regenerated for the instrument dial panel (#97):
-portrait now carries a floating glass dial panel at the bottom in place of the
-docked drawer — the leg being turned named over a graduated ruler under a fixed
-needle, with an advisory footer beneath. Full stops are numbered, the half- and
-third-stop clicks between them are bare ticks. (The exposure chips and the
+changes deliberately. Last regenerated for the compensation track (#98): the
+dial panel now carries a permanent, draggable exposure-compensation scale below a
+hairline, under the ruler and above the advisory footer, showing the signed value
+alongside it. The compensation status pill left portrait with it, so only the
+metering-pattern pill floats under the bar until #99. (The panel arrived in #97:
+a floating glass panel replacing the docked drawer — the leg being turned named
+over a graduated ruler under a fixed needle. Full stops are numbered, the half-
+and third-stop clicks between them are bare ticks. The exposure chips and the
 solved-leg hero left with the drawer; the segmented row that restores priority
 switching lands in #99.)
 
@@ -167,7 +170,7 @@ are named so a review can ask for one by name.
 | `frozen` | A held reading — the padlock closed. | `-harness-frozen` |
 | `spot` | Spot metering with the circular reticle at the frame center. EV is read off the headline bar — the reticle carries no reading of its own. | `-harness-pattern spot` |
 | `shutter-priority` | The shutter locked and the aperture solved — the mirror of the default. | `-harness-priority shutter` |
-| `compensated` | +1 EV of deliberate bias, on the pill and in the solve. | `-harness-compensation 1.0` |
+| `compensated` | +1 EV of deliberate bias, on the panel's compensation track and in the solve. | `-harness-compensation 1.0` |
 | `no-advisories` | A comfortable solve, so the advisory row is deliberately empty. | `-harness-advisory none` |
 | `handheld-risk` | The soft warning: a solve between 1/60 s and 1/15 s. | `-harness-advisory handheld -harness-scene mixed-contrast` |
 | `tripod` | The strong warning: a one-second solve. | `-harness-advisory tripod -harness-scene dim-interior` |

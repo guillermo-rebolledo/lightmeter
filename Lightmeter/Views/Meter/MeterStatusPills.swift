@@ -28,6 +28,14 @@ struct MeterStatusPills: View {
     /// The guided tour's current step, or `nil` when the tour isn't running.
     var tourStep: GuidedTourStep?
 
+    /// Which controls the pair renders, in order. Both by default — landscape's
+    /// arrangement. Portrait passes only `.pattern`: #98 rehoused compensation
+    /// into the dial panel's own draggable track and retired its pill, so the
+    /// portrait pair carries the pattern alone until #99 moves it too. The `Control`
+    /// enum keeps both cases either way, so a pill's behaviour is still described
+    /// (and tested) in one place whichever layout shows it.
+    var controls: [Control] = Control.allCases
+
     /// Which occasional control a pill exposes — also the reveal identity and the
     /// single-open-at-a-time selector.
     enum Control: Hashable, CaseIterable {
@@ -111,14 +119,18 @@ struct MeterStatusPills: View {
     /// pill's step; otherwise the photographer's own open editor (untouched by the
     /// tour, keeping the reveal purely view-local).
     private var effectiveOpen: Control? {
-        Self.tourEditor(for: tourStep) ?? openEditor
+        guard let candidate = Self.tourEditor(for: tourStep) ?? openEditor,
+              controls.contains(candidate) else { return nil }
+        // A control the current layout doesn't render can't be revealed — portrait
+        // shows only the pattern pill, so a stray compensation step can't open an
+        // editor with no pill to hang under.
+        return candidate
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                pill(.pattern)
-                pill(.compensation)
+                ForEach(controls, id: \.self) { pill($0) }
             }
             if let editor = effectiveOpen {
                 revealed(editor)

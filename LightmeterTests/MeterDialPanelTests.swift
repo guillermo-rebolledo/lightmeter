@@ -122,6 +122,22 @@ struct MeterDialPanelTests {
             #expect(panelSize(model, advisories: []).height == baseline.height, "\(shutter)s")
         }
     }
+
+    /// …and identical across the compensation value the new track carries. `-3`,
+    /// `0`, `+3`: the signed readout is one scale-to-fit line and the track is a
+    /// fixed-height band, so nudging the bias never lifts the rule out from under
+    /// the thumb dragging it — the AC's "panel height is unchanged by compensation
+    /// value".
+    @Test func theCompensationValueNeverResizesThePanel() async {
+        let model = await meteringModel()
+        let baseline = panelSize(model, advisories: [])
+
+        for bias in [-3.0, 0.0, 3.0] {
+            model.setCompensation(bias)
+            #expect(model.compensation == bias)
+            #expect(panelSize(model, advisories: []).height == baseline.height, "\(bias) EV")
+        }
+    }
 }
 
 /// The advisory footer in isolation: the reserved slot whose height is the same
