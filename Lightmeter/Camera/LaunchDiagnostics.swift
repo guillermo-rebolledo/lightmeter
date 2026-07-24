@@ -53,6 +53,12 @@ enum LaunchDiagnostics {
     /// The unified-log channel every diagnostic line goes to. Filter Console (or
     /// `log stream`) on `subsystem: com.lightmeter, category: launch` to watch a
     /// launch live, or copy the run into the issue as the captured finding.
+    // Logged at `.notice`, not `.debug`: unlike the per-frame reading instrument,
+    // this emits only a handful of sparse lines per launch that are meant to be
+    // read and pasted into the issue. `.notice` persists them — so a run can be
+    // pulled after the fact with `log show --predicate 'subsystem ==
+    // "com.lightmeter"'` — and surfaces them in the Xcode console and Console.app
+    // without opting into debug messages or streaming before launch.
     static let logger = Logger(subsystem: "com.lightmeter", category: "launch")
 
     /// A main-queue round trip slower than this counts as a stall worth logging —
@@ -126,7 +132,7 @@ enum LaunchDiagnostics {
     /// actor.
     static func mark(_ milestone: Milestone) {
         guard isEnabled else { return }
-        logger.debug(
+        logger.notice(
             "\(milestoneLine(event: milestone.rawValue, sinceLaunchMS: elapsedMilliseconds()), privacy: .public)"
         )
     }
@@ -148,10 +154,10 @@ enum LaunchDiagnostics {
     @MainActor static func arm() {
         guard isEnabled, monitor == nil else { return }
         _ = launchReference // Resolve the zero point at the first-appearance call site.
-        logger.debug("armed — watching the main thread for stalls ≥ \(Int(hangThreshold * 1000), privacy: .public)ms")
+        logger.notice("armed — watching the main thread for stalls ≥ \(Int(hangThreshold * 1000), privacy: .public)ms")
 
         let monitor = MainThreadHangMonitor(reference: launchReference) { stall, at in
-            logger.debug(
+            logger.notice(
                 "\(stallLine(stallMS: stall * 1000, sinceLaunchMS: at * 1000), privacy: .public)"
             )
         }
@@ -175,7 +181,7 @@ enum LaunchDiagnostics {
     @MainActor static func noteFirstDialDrag() {
         guard isEnabled, !didNoteFirstDialDrag else { return }
         didNoteFirstDialDrag = true
-        logger.debug(
+        logger.notice(
             "\(milestoneLine(event: Milestone.firstDialDrag.rawValue, sinceLaunchMS: elapsedMilliseconds()), privacy: .public)"
         )
         stopMonitor()
