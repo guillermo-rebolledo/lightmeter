@@ -190,6 +190,38 @@ enum LaunchDiagnostics {
         stopMonitor()
     }
 
+    /// How many updates the first drag has delivered, and whether it has ended — so
+    /// a "moved a little then stuck" drag reads as either the updates drying up (the
+    /// gesture was cancelled / touches stopped) or the updates continuing while the
+    /// value clamps (a dial-math stall). Touched only on the main actor, where the
+    /// gesture runs.
+    @MainActor private static var firstDragChangeCount = 0
+    @MainActor private static var didEndFirstDialDrag = false
+
+    /// Logs each update of the *first* drag (capped, so a long smooth drag can't
+    /// flood the log) with how far the finger has travelled. If dx keeps climbing
+    /// while the dial visually sticks, the fault is the dial's drag→stop math, not
+    /// touch delivery; if the updates simply stop, the gesture was interrupted.
+    @MainActor static func noteDialDragChange(translationWidth: Double) {
+        guard isEnabled, didNoteFirstDialDrag, !didEndFirstDialDrag else { return }
+        firstDragChangeCount += 1
+        guard firstDragChangeCount <= 12 else { return }
+        logger.notice(
+            "dialDragChange #\(firstDragChangeCount, privacy: .public) dx=\(String(format: "%.1f", translationWidth), privacy: .public) at +\(String(format: "%.1f", elapsedMilliseconds()), privacy: .public)ms"
+        )
+    }
+
+    /// Logs when the first drag ends, with how many updates it delivered — the
+    /// companion to `noteDialDragChange`. A low count here on a drag the finger
+    /// never lifted from is the gesture being cancelled out from under it.
+    @MainActor static func noteFirstDialDragEnded() {
+        guard isEnabled, didNoteFirstDialDrag, !didEndFirstDialDrag else { return }
+        didEndFirstDialDrag = true
+        logger.notice(
+            "dialDragEnded afterChanges=\(firstDragChangeCount, privacy: .public) at +\(String(format: "%.1f", elapsedMilliseconds()), privacy: .public)ms"
+        )
+    }
+
     /// How long the watchdog runs before giving up on its own — comfortably past
     /// the first-couple-of-seconds window the swallowed touches fall in.
     private static let warmupWindow: CFTimeInterval = 8

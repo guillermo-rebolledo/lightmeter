@@ -244,6 +244,13 @@ struct LinearDialView: View {
                     haptics.prepare()
                 }
 
+                #if DEBUG
+                // #112: narrate the first drag's updates so "moved a little then
+                // stuck" reads as a cancelled gesture (updates stop) vs a value
+                // that clamps while the finger keeps moving (dx keeps climbing).
+                LaunchDiagnostics.noteDialDragChange(translationWidth: value.translation.width)
+                #endif
+
                 // Dragging back (left) advances toward higher values; one
                 // `stopSpacing` of travel is one stop.
                 let travel = value.translation.width
@@ -261,6 +268,11 @@ struct LinearDialView: View {
                 onSelect(rounded)
             }
             .onEnded { _ in
+                #if DEBUG
+                // #112: pairs with `noteDialDragChange` — a low change count on a
+                // drag the finger never lifted from is the gesture being cancelled.
+                LaunchDiagnostics.noteFirstDialDragEnded()
+                #endif
                 // Every crossing was already reported in `onChanged`; this settles
                 // the fractional overshoot onto the snapped stop — with the
                 // instrument's shared spring, because a rule that eased to a stop
