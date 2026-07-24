@@ -185,6 +185,14 @@ struct ContentView: View {
             .toolbarBackground(.hidden, for: .navigationBar)
             .tint(.appAccent)
             .task {
+                #if DEBUG
+                // Pin the launch clock and begin watching the main thread for the
+                // warmup hitch that swallows early ruler drags (#112) — before
+                // `start()`, so the watchdog is already probing across the camera
+                // warmup it is there to catch. Inert unless launched with
+                // `-launch-diagnostics`.
+                LaunchDiagnostics.arm()
+                #endif
                 await model.start()
                 #if DEBUG
                 // Drives the meter to the state this launch named, or does

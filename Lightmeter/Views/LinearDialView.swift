@@ -232,6 +232,13 @@ struct LinearDialView: View {
                 // movement is measured from — and ticks relative to — where the
                 // dial actually sits, not a stale index from a prior binding.
                 if dragPosition == nil {
+                    #if DEBUG
+                    // #112: a drag reaching here means the main thread delivered a
+                    // touch to the ruler. The first one, stamped against launch,
+                    // is the "draggable within the first frames?" answer — it lands
+                    // before or after any warmup stall the watchdog logs.
+                    LaunchDiagnostics.noteFirstDialDrag()
+                    #endif
                     dragAnchorIndex = selectedIndex
                     committedIndex = selectedIndex
                     haptics.prepare()

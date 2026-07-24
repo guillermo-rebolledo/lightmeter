@@ -38,6 +38,16 @@ struct CameraPreviewView: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> PreviewView {
+        #if DEBUG
+        // #112: bracket the main-thread preview-layer attach — assigning the
+        // session and standing up the `RotationCoordinator`, both on this first
+        // layout pass. It is the one warmup suspect that runs on main, so a stall
+        // the watchdog reports between these two marks is the swallowed-touch
+        // window pinned to *this* step rather than to session start (off main) or
+        // first-frame delivery. Inert unless launched with `-launch-diagnostics`.
+        LaunchDiagnostics.mark(.previewAttachBegan)
+        defer { LaunchDiagnostics.mark(.previewAttachEnded) }
+        #endif
         let view = PreviewView()
         view.videoPreviewLayer.session = session
         view.videoPreviewLayer.videoGravity = .resizeAspectFill
