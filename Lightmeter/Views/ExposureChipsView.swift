@@ -27,11 +27,43 @@ struct ExposureChipsView: View {
     /// Which leg the ruler dial is currently bound to, or `nil` while the
     /// compensation overlay owns the dial — the chip to highlight as selected.
     let boundComponent: ExposureComponent?
+    /// How loudly the chips read. `.compact` is the landscape drawer's secondary
+    /// row; `.hero` is portrait's settings-first headline, where the three values
+    /// the photographer dials into the camera are the screen's largest thing.
+    var emphasis: Emphasis = .compact
     /// Called when a chip is tapped. A live leg moves the dial to itself; the
     /// solved leg claims priority. The view leaves that routing to the model.
     let onSelect: (ExposureComponent) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The size the chip values are typeset at. The role styling (accent/muted,
+    /// padlock, selection ring) and the zero-reflow layout are identical across
+    /// both — only the numeral's point size changes — so making the triangle the
+    /// hero costs none of the stability the chips were built for.
+    enum Emphasis: Equatable {
+        /// The landscape drawer's secondary row.
+        case compact
+        /// Portrait's settings-first headline — the loudest values on screen.
+        case hero
+
+        /// The value numeral's font. `.hero` is the app's largest numeral — a
+        /// clear step above the dial panel's 26pt turning numeral (see
+        /// ``heroValuePointSize``) so the triangle, not the leg under the needle,
+        /// is unambiguously the headline; fixed like the app's other heroes,
+        /// because it already outruns any Dynamic Type size and only needs to keep
+        /// fitting.
+        var valueFont: Font {
+            switch self {
+            case .compact: AppTypography.numeral(.title3)
+            case .hero: AppTypography.numeral(fixedSize: Self.heroValuePointSize)
+            }
+        }
+
+        /// The settings-first hero's value size, named so a test can pin it above
+        /// the dial panel's 26pt turning numeral rather than trusting the literal.
+        static let heroValuePointSize: CGFloat = 30
+    }
 
     var body: some View {
         EqualWidthRow(spacing: 10) {
@@ -52,6 +84,7 @@ struct ExposureChipsView: View {
             role: Self.role(for: component, triangle: triangle),
             isBound: boundComponent == component,
             component: component,
+            emphasis: emphasis,
             onSelect: onSelect
         )
     }
@@ -121,6 +154,9 @@ struct ExposureValueChip: View {
     /// `role`, and shown as a ring rather than a marking.
     let isBound: Bool
     let component: ExposureComponent
+    /// How large the value reads — the chips' shared emphasis, defaulted so the
+    /// landscape drawer and the tests that measure a chip need not name it.
+    var emphasis: ExposureChipsView.Emphasis = .compact
     let onSelect: (ExposureComponent) -> Void
 
     var body: some View {
@@ -156,7 +192,7 @@ struct ExposureValueChip: View {
             }
 
             Text(value)
-                .font(AppTypography.numeral(.title3))
+                .font(emphasis.valueFont)
                 .contentTransition(.numericText())
                 .foregroundStyle(valueStyle)
                 .scaledToFitOnOneLine()

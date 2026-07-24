@@ -135,18 +135,54 @@ struct ExposureChipsViewTests {
         #expect(idealChipSize(role: .held, isBound: true) == idealChipSize(role: .held, isBound: false))
     }
 
+    /// The settings-first portrait hero raises only the value's point size; the
+    /// reserved marking slot and the role styling are untouched, so a role change
+    /// is still a pure repaint at the larger emphasis — the reflow guarantee holds
+    /// exactly as it does in the landscape drawer.
+    @MainActor
+    @Test func heroEmphasisStaysZeroReflowAcrossRoles() {
+        let sizes = [ExposureChipsView.ChipRole.held, .solved, .plain]
+            .map { idealChipSize(role: $0, emphasis: .hero) }
+        #expect(sizes.allSatisfy { $0 == sizes[0] }, "\(sizes)")
+        #expect(sizes[0].width > 0 && sizes[0].height > 0)
+    }
+
+    /// The hero emphasis actually reads larger than the compact drawer chip — the
+    /// whole point of the settings-first pass is that the triangle, not EV, is the
+    /// screen's loudest value. Measured so a future tweak that quietly equalises
+    /// the two is caught.
+    @MainActor
+    @Test func heroEmphasisReadsLargerThanCompact() {
+        let hero = idealChipSize(role: .held, emphasis: .hero)
+        let compact = idealChipSize(role: .held, emphasis: .compact)
+        #expect(hero.height > compact.height, "hero \(hero) vs compact \(compact)")
+    }
+
+    /// The triangle must out-read the *dial's* turning numeral, not merely the
+    /// landscape drawer chip — the dial value is the other large numeral on the
+    /// portrait screen, so it is the real competitor for "biggest thing". Pinned
+    /// against `MeterDialPanel`'s own constant so a later dial bump can't silently
+    /// tie the hero.
+    @Test func theHeroValueOutranksTheDialTurningNumeral() {
+        #expect(
+            ExposureChipsView.Emphasis.heroValuePointSize > MeterDialPanel.turningNumeralPointSize
+        )
+    }
+
     /// The ideal (unproposed) size of a single chip — what the row's layout works
     /// from, and therefore the number that must not move when a role changes.
     @MainActor
     private func idealChipSize(
         role: ExposureChipsView.ChipRole,
-        isBound: Bool = false
+        isBound: Bool = false,
+        emphasis: ExposureChipsView.Emphasis = .compact
     ) -> CGSize {
         let chip = ExposureValueChip(
             value: "f/16",
             role: role,
             isBound: isBound,
             component: .aperture,
+            emphasis: emphasis,
             onSelect: { _ in }
         )
         return UIHostingController(rootView: chip).view.intrinsicContentSize
