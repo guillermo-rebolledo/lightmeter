@@ -82,6 +82,12 @@ enum GlassSurface: Equatable {
     /// backing the receiver's content; the receiver supplies only the frame.
     case drawer(edge: DrawerEdge)
 
+    /// A floating panel inset from the screen edges — the EV headline bar —
+    /// including its legibility scrim. Like the drawer it draws a surface of its
+    /// own rather than backing the receiver's content, and unlike the drawer it
+    /// is rounded on all four sides and touches no screen edge.
+    case panel
+
     /// The chip surface's shape, shared with the selection ring drawn over it.
     static let chipShape = RoundedRectangle(cornerRadius: 14, style: .continuous)
 
@@ -99,12 +105,13 @@ enum GlassSurface: Equatable {
         case .chip: .chip
         case .settingsGear: .settingsGear
         case .drawer: .drawer
+        case .panel: .panel
         }
     }
 
     /// The surfaces, stripped of their state.
     enum Kind: CaseIterable {
-        case group, pill, lock, chip, settingsGear, drawer
+        case group, pill, lock, chip, settingsGear, drawer, panel
     }
 
     /// At least one value per case — every state that changes the surface, and
@@ -119,6 +126,7 @@ enum GlassSurface: Equatable {
         .settingsGear,
         .drawer(edge: .bottom),
         .drawer(edge: .trailing),
+        .panel,
     ]
 }
 
@@ -136,6 +144,27 @@ extension View {
     /// iOS 26 API — while the decision belongs to ``LiquidGlass/isEnabled``.
     func glassSurface(_ surface: GlassSurface) -> some View {
         glassSurface(surface, isGlassEnabled: LiquidGlass.isEnabled)
+    }
+
+    /// Renders `surface` only when `isPresent` — otherwise the receiver stands
+    /// alone, unsurfaced on both paths.
+    ///
+    /// The same control can need a surface in one home and none in another: the
+    /// freeze padlock and the settings gear float over the live preview in
+    /// landscape, where they need one, and ride the EV headline bar in portrait,
+    /// where the panel already separates them from the scene and a second glass
+    /// shape would read as a control stacked on a control.
+    ///
+    /// It lives here, beside the gate, rather than as an `if` at each call site
+    /// (ADR-0002): *whether* a surface is drawn is the same kind of decision as
+    /// *how*, and both belong to the one file that owns glass.
+    @ViewBuilder
+    func glassSurface(_ surface: GlassSurface, when isPresent: Bool) -> some View {
+        if isPresent {
+            glassSurface(surface)
+        } else {
+            self
+        }
     }
 
     /// The seam under ``glassSurface(_:)``: the same rendering with the gate's
@@ -183,6 +212,14 @@ extension View {
             // composited in front of it — see `DrawerSurface.scrim`.
             glassEffect(.regular, in: edge.drawerShape)
                 .overlay { edge.scrim(opacity: DrawerSurface.glassScrimOpacity) }
+
+        case .panel:
+            // Clear glass in the panel's shape, scrim in front of it for the
+            // same reason the drawer's is — see `FloatingPanel.scrim`. No border:
+            // Liquid Glass draws its own edge, and a second one on top of it
+            // reads as a stroke rather than as a lit rim.
+            glassEffect(.regular, in: FloatingPanel.shape)
+                .overlay { FloatingPanel.scrim(opacity: FloatingPanel.glassScrimOpacity) }
         }
     }
 
@@ -228,6 +265,21 @@ extension View {
                 .background(.ultraThinMaterial, in: edge.drawerShape)
                 .opacity(0.82)
                 .overlay { edge.scrim(opacity: DrawerSurface.fallbackScrimOpacity) }
+
+        case .panel:
+            // The same dialled-back material the drawer falls back to, under the
+            // same denser scrim — and, unlike the drawer, a hairline rim. The
+            // drawer is anchored by the screen edge it is flush against; a panel
+            // floating in the middle of a live scene has nothing to read its
+            // extent from, and the material alone gives it no edge to find.
+            hidden()
+                .background(.ultraThinMaterial, in: FloatingPanel.shape)
+                .opacity(0.82)
+                .overlay { FloatingPanel.scrim(opacity: FloatingPanel.fallbackScrimOpacity) }
+                .overlay {
+                    FloatingPanel.shape
+                        .strokeBorder(.white.opacity(FloatingPanel.fallbackRimOpacity), lineWidth: 1)
+                }
         }
     }
 }
@@ -249,13 +301,19 @@ extension View {
 /// the chips' selection-ring vocabulary: the padlock glyph is already accent, and
 /// tinting the fill underneath it would put accent on accent. Like the chip ring
 /// it is a stroke inside the control's own bounds, so freezing costs no layout.
+/// The ring is drawn whether or not the surface is: on a glass panel the padlock
+/// gives up its own circle (see ``FreezeButton/hasSurface``) but not the cue that
+/// says the reading is held.
 struct GlassLockBackground: ViewModifier {
     /// Whether the reading is held — the closed-padlock state, ringed.
     let isHeld: Bool
 
+    /// Whether the padlock draws a surface of its own beneath the ring.
+    var hasSurface = true
+
     func body(content: Content) -> some View {
         content
-            .glassSurface(.lock)
+            .glassSurface(.lock, when: hasSurface)
             .overlay(
                 Circle().strokeBorder(.tint.opacity(isHeld ? 0.9 : 0), lineWidth: 1.5)
             )
@@ -283,6 +341,60 @@ struct GlassChipBackground: ViewModifier {
                 GlassSurface.chipShape
                     .strokeBorder(.tint.opacity(isBound ? 0.9 : 0), lineWidth: 1.5)
             )
+    }
+}
+
+// MARK: - The floating panel
+
+extension View {
+    /// Lays the floating-panel surface behind the receiver: clear Liquid Glass in
+    /// a rounded rectangle, or the material fallback, with the legibility scrim
+    /// composited in front of it on both paths.
+    ///
+    /// The counterpart of ``docked(edge:)`` for a panel that touches no screen
+    /// edge. It carries no stretch of its own — a floating panel is inset by its
+    /// caller, which is what "floating" means — and no `glassGroup()`: the bar's
+    /// controls are drawn as chrome *on* the panel rather than as glass surfaces
+    /// of their own, so there is nothing inside to blend.
+    func floatingPanel() -> some View {
+        background {
+            FloatingPanel.shape
+                .glassSurface(.panel)
+        }
+    }
+}
+
+/// The floating panel's shared metrics — the numbers both paths are cut from.
+///
+/// It is the drawer's sibling, so it borrows the drawer's scrim levels: the two
+/// surfaces are on screen together, over the same scene, and a panel that
+/// darkened its backdrop differently would read as a different material rather
+/// than as the same one in a different shape.
+enum FloatingPanel {
+    /// The handoff's 24pt radius, rounded on all four corners.
+    static let cornerRadius: CGFloat = 24
+
+    /// The panel's shape, shared by the surface, the scrim, and the fallback's rim.
+    static let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+    static let glassScrimOpacity = DrawerSurface.glassScrimOpacity
+    static let fallbackScrimOpacity = DrawerSurface.fallbackScrimOpacity
+
+    /// The fallback's hairline rim, from the handoff's `rgba(255,255,255,.14)`.
+    static let fallbackRimOpacity = 0.14
+
+    /// The legibility scrim, composited **in front of** the glass / material
+    /// rather than tinted underneath it — the same compositing order, and for the
+    /// same reason, as the drawer's: Liquid Glass refracts the scene behind it,
+    /// and a scrim tinted *under* the glass is overpowered exactly where the
+    /// bar's white and `.secondary` text sits.
+    ///
+    /// Flat rather than graduated. The drawer's gradient darkens the inner edge
+    /// where it pulls in the bright scene above it; a floating panel has four
+    /// inner edges and no screen edge to fall away toward, so there is no
+    /// direction for a gradient to run.
+    static func scrim(opacity: CGFloat) -> some View {
+        shape.fill(.black.opacity(opacity))
     }
 }
 

@@ -69,8 +69,9 @@ clever:
 
 Today's meter screen under the harness — the baseline any variant is compared
 against. Regenerate them with the sequence below whenever the meter screen
-changes deliberately. Last regenerated for the brass accent and the monospaced
-numeric face (#95, ADR-0003).
+changes deliberately. Last regenerated for the EV headline bar (#96): portrait
+now carries a floating glass bar at the top reading scene brightness, with the
+freeze padlock and the settings gear rehoused at its two ends.
 
 | `blown-sky` | `dim-interior` | `mixed-contrast` |
 | --- | --- | --- |
@@ -158,9 +159,9 @@ are named so a review can ask for one by name.
 | Name | What it shows | Arguments (after `-design-harness`) |
 | --- | --- | --- |
 | `default` | The ordinary screen: aperture-priority, average, live. The baseline. | *(none)* |
-| `pending` | Metering, before the first reading: the hero and the solved chip on their em-dash placeholder, no EV. | `-harness-pending` |
+| `pending` | Metering, before the first reading: the headline reads `EV —`, and the hero and the solved chip sit on the same em-dash placeholder. | `-harness-pending` |
 | `frozen` | A held reading — the padlock closed. | `-harness-frozen` |
-| `spot` | Spot metering with the reticle at the frame center, EV on the badge. | `-harness-pattern spot` |
+| `spot` | Spot metering with the circular reticle at the frame center. EV is read off the headline bar — the reticle carries no reading of its own. | `-harness-pattern spot` |
 | `shutter-priority` | The shutter locked and the aperture solved — the mirror of the default. | `-harness-priority shutter` |
 | `compensated` | +1 EV of deliberate bias, on the pill and in the solve. | `-harness-compensation 1.0` |
 | `no-advisories` | A comfortable solve, so the advisory row is deliberately empty. | `-harness-advisory none` |
@@ -192,6 +193,11 @@ every state above rather than needing an argument of its own:
 ```sh
 xcrun simctl ui "$UDID" content_size accessibility-extra-large   # accessibility3
 ```
+
+The EV headline bar is the one surface that changes *shape* rather than only size
+here: at the accessibility tiers it reflows onto two lines, because
+`EXPOSURE VALUE @ ISO 100` at those sizes is wider than any iPhone and holding it
+on one row would crush the headline it labels. Both arrangements are worth a look.
 
 The tiers the meter is checked at are `large` (the default),
 `accessibility-extra-large` (`accessibility3` — where
@@ -233,8 +239,8 @@ All of it rests on there being exactly one decision to force.
 - `LiquidGlass.isEnabled` — the only question anything asks. `false` below
   iOS 26, and `false` on iOS 26 when the flag is set.
 - `GlassSurface` — every glass surface in the app as data (pill, lock, chip,
-  circle, group, drawer), rendered by one `glassSurface(_:)` helper that asks the
-  gate once.
+  settings gear, group, drawer, floating panel), rendered by one
+  `glassSurface(_:)` helper that asks the gate once.
 
 No other file in the app or the widget extension mentions iOS 26 or the glass
 API — not even in a comment — and
@@ -279,9 +285,9 @@ them to get an ordinary run back.
 ## What the harness does not reproduce
 
 - **The camera preview itself**, obviously — including its rotation handling and
-  its device-point conversion. The stand-in draws its own approximation of the
-  spot reticle so spot mode stays inspectable, matched to the shipped UIKit one
-  by eye rather than by shared code.
+  its device-point conversion. The stand-in redraws the spot reticle in SwiftUI
+  so spot mode stays inspectable; every dimension comes from the same
+  `ReticleGeometry` the shipped UIKit one strokes, so the two cannot drift.
 - **Live light.** The scene EV is fixed for the launch, so the meter reads a
   steady value. Freeze, priority, compensation and the dial are all fully
   drivable on top of it — from the launch arguments above, or by hand.

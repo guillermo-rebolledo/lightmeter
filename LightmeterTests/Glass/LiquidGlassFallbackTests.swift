@@ -168,7 +168,7 @@ struct LiquidGlassFallbackTests {
     static let surfacesThatMustBeSeen: [GlassSurface] = GlassSurface.all.filter { surface in
         switch surface.kind {
         case .group, .settingsGear: false
-        case .pill, .lock, .chip, .drawer: true
+        case .pill, .lock, .chip, .drawer, .panel: true
         }
     }
 
@@ -203,13 +203,15 @@ struct LiquidGlassFallbackTests {
         return renderer.uiImage?.pngData()
     }
 
-    /// What each surface is applied to: the drawer's own shape for the drawer
-    /// (which supplies the frame its surface fills), a control's label for the
-    /// rest.
+    /// What each surface is applied to: its own shape for the two surfaces that
+    /// draw rather than back their receiver (the drawer and the floating panel,
+    /// which are handed only a frame to fill), a control's label for the rest.
     private static func content(for surface: GlassSurface) -> AnyView {
         switch surface {
         case .drawer(let edge):
             AnyView(edge.drawerShape)
+        case .panel:
+            AnyView(FloatingPanel.shape)
         default:
             AnyView(Text("f/8").padding(8))
         }

@@ -1,13 +1,15 @@
 import SwiftUI
 
-/// The meter screen: a live camera preview as the hero, with the scene's
-/// EV@ISO100 read out over it and updating in real time. Falls back to a graceful
-/// explanation when camera access is denied or capture is unavailable.
+/// The meter screen: a live camera preview behind the metering HUD, updating in
+/// real time. Falls back to a graceful explanation when camera access is denied
+/// or capture is unavailable.
+///
+/// What floats *over* the preview differs by orientation, which is why the two
+/// layouts own it: portrait pins the EV headline bar at the top and hangs the
+/// status pills under it, while landscape — which has no bar — keeps the pills
+/// and the settings gear floating in the two top corners, as both orientations
+/// did before #96.
 struct ContentView: View {
-    private enum Destination: Hashable {
-        case settings
-    }
-
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityVoiceOverEnabled) private var isVoiceOverRunning
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -19,7 +21,7 @@ struct ContentView: View {
     @State private var model: MeterViewModel
     @State private var preferences: MeterPreferences
     @State private var tour: GuidedTourController
-    @State private var path: [Destination] = []
+    @State private var path: [MeterDestination] = []
     /// Advisories frozen for the tour's lifetime so their height cannot drift.
     @State private var tourAdvisories: [ExposureAdvisory]?
 
@@ -79,44 +81,41 @@ struct ContentView: View {
                 case .idle, .metering:
                     backdrop
                     meterLayout
-                    // EV's home is the metered point, not the hero: on the
-                    // reticle in spot metering (drawn by the preview above), and
-                    // here as a quiet label when the whole frame is averaged.
-                    secondaryEVReadout
-                    // The occasional controls live over the preview in the
-                    // top-left — mirroring the settings gear opposite them —
-                    // rather than inside the HUD card, so both states are
-                    // always readable and the card stays clear.
-                    statusPills
+                    // EV has no home over the preview any more: it is the
+                    // headline of the portrait bar, which `PortraitMeterLayout`
+                    // owns. The reticle is a point marker again, carrying no
+                    // reading of its own.
+                    //
+                    // The occasional controls still float over the preview in
+                    // landscape, which has no bar to hold them; in portrait they
+                    // are owned by the layout, stacked under the bar.
+                    if isLandscape {
+                        statusPills
+                        // …and so does landscape's EV, which the bar reads in
+                        // portrait. The variant is portrait-only, so removing
+                        // EV's two old homes must not leave this orientation
+                        // with no reading at all.
+                        landscapeEVLabel
+                    }
                 case .denied:
                     CameraStatusView(status: .denied)
                 case .unavailable:
                     CameraStatusView(status: .unavailable)
                 }
             }
-            // Own the gear in content space (not ToolbarItem) so the tour
-            // anchor and the tappable control share one resolved frame.
-            // Avoid `.offset` — it moves pixels without moving layout bounds,
-            // which leaves the spotlight stranded away from the gear.
+            // The floating gear, owned in content space (not a ToolbarItem) so
+            // the tour anchor and the tappable control share one resolved frame.
+            // Shown wherever the EV headline bar is not carrying a gear of its
+            // own — see `showsFloatingGear`.
             .overlay(alignment: .topTrailing) {
-                NavigationLink(value: Destination.settings) {
-                    Label("Settings", systemImage: "gearshape")
-                        .labelStyle(.iconOnly)
-                        .foregroundStyle(.tint)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                        // On the glass path, a small Liquid Glass circle; on the
-                        // fallback, the bare tinted icon it has always been.
-                        .glassSurface(.settingsGear)
+                if showsFloatingGear {
+                    MeterSettingsGear()
+                        .padding(.top, 4)
+                        // In landscape the HUD drawer hugs the trailing edge;
+                        // inset the gear past the drawer's width so it stays over
+                        // the preview and never disappears beneath the drawer.
+                        .padding(.trailing, isLandscape ? LandscapeMeterLayout.drawerWidth + 8 : 8)
                 }
-                .buttonStyle(.plain)
-                .tint(.appAccent)
-                .guidedTourAnchor(.settings)
-                .padding(.top, 4)
-                // In landscape the HUD drawer hugs the trailing edge; inset the
-                // gear past the drawer's width so it stays over the preview and
-                // never disappears beneath the drawer.
-                .padding(.trailing, isLandscape ? LandscapeMeterLayout.drawerWidth + 8 : 8)
             }
             // One declaration for the whole meter screen — the HUD, the floating
             // pills, and the gear that sits opposite them — which is what makes
@@ -174,7 +173,7 @@ struct ContentView: View {
                     value: tour.currentStep
                 )
             }
-            .navigationDestination(for: Destination.self) { destination in
+            .navigationDestination(for: MeterDestination.self) { destination in
                 switch destination {
                 case .settings:
                     SettingsView(
@@ -211,6 +210,25 @@ struct ContentView: View {
     /// iPhone landscape: the compact vertical size class drives the edge layout.
     private var isLandscape: Bool { verticalSizeClass == .compact }
 
+    /// Whether the meter itself is on screen, as opposed to one of the two
+    /// camera-refused states.
+    private var isShowingMeter: Bool {
+        switch model.status {
+        case .idle, .metering: true
+        case .denied, .unavailable: false
+        }
+    }
+
+    /// Whether the gear floats in the corner rather than riding the EV headline
+    /// bar. True in landscape, which has no bar — and true in portrait whenever
+    /// the meter is not on screen, because the bar goes with it: a denied or
+    /// unavailable camera would otherwise leave the app's *own* Settings (stop
+    /// increment, calibration) with no route to it at all. `CameraStatusView`'s
+    /// link opens iOS Settings, which is a different destination.
+    private var showsFloatingGear: Bool {
+        isLandscape || isShowingMeter == false
+    }
+
     /// What sits behind the HUD: the live camera preview — the hero — whenever
     /// there is a capture device, and the design harness' stand-in scene when
     /// there isn't. Production always takes the first branch.
@@ -221,7 +239,6 @@ struct ContentView: View {
                 captureDevice: camera.captureDevice,
                 spot: model.spot,
                 isSpotActive: model.pattern == .spot,
-                evReadout: evReadout,
                 onPlaceSpot: { model.placeSpot(at: $0) }
             )
             .ignoresSafeArea()
@@ -239,7 +256,6 @@ struct ContentView: View {
             scene: DesignHarness.backdropScene,
             spot: model.spot,
             isSpotActive: model.pattern == .spot,
-            evReadout: evReadout,
             onPlaceSpot: { model.placeSpot(at: $0) }
         )
         #else
@@ -268,18 +284,19 @@ struct ContentView: View {
                 PortraitMeterLayout(
                     model: model,
                     advisories: advisories,
-                    isTourActive: tour.isPresented
+                    isTourActive: tour.isPresented,
+                    tourStep: activeTourStep
                 )
             }
         }
         .animation(reduceMotion ? nil : .smooth, value: verticalSizeClass)
     }
 
-    /// The metering pattern and compensation status pills, floated over the
-    /// preview in the top-left — the mirror of the settings gear opposite them.
-    /// Owned here rather than by either layout so the pair sits in the same place
-    /// in both orientations (the landscape drawer hugs the trailing edge, leaving
-    /// the leading corner clear).
+    /// **Landscape's** metering pattern and compensation status pills, floated
+    /// over the preview in the top-left — the mirror of the settings gear
+    /// opposite them. The landscape drawer hugs the trailing edge, which is what
+    /// leaves this corner clear. Portrait stacks the same pair under its EV
+    /// headline bar instead, so the bar's corner is not fought over.
     private var statusPills: some View {
         MeterStatusPills(model: model, tourStep: activeTourStep)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -287,30 +304,16 @@ struct ContentView: View {
             .padding(.leading, 8)
     }
 
-    /// Where EV is shown over the preview, and what it reads — derived from the
-    /// already-published `pattern`/`spot`/`ev`. Owned here because both homes
-    /// hang off the preview: the reticle badge inside `CameraPreviewView`, and
-    /// the average-metering label below.
-    private var evReadout: PreviewEVReadout? {
-        PreviewEVReadout(pattern: model.pattern, spot: model.spot, ev: model.ev)
+    /// Landscape's quiet EV label, floated at the top of the preview — where EV
+    /// was read in this orientation before the portrait bar took it over, and
+    /// still is. Clear of the frame's center, where the photographer is composing.
+    private var landscapeEVLabel: some View {
+        LandscapeEVLabel(
+            readout: EVHeadlineReadout(ev: model.ev, triangle: model.triangle)
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.top, 8)
     }
-
-    /// The average-metering EV label, floated at the top of the preview —
-    /// subordinate to the HUD's hero, and clear of the frame's center where the
-    /// photographer is composing. Centered *below* the status-pill row rather
-    /// than beside it, so the widest pair of pills can't crowd it on a narrow
-    /// phone; the pills' revealed editor is transient and draws over it.
-    private var secondaryEVReadout: some View {
-        PreviewEVReadoutView(readout: evReadout)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .padding(.top, statusPillRowHeight + 12)
-    }
-
-    /// The status pills' own row height — what the EV label clears — scaled with
-    /// Dynamic Type alongside the pills' footnote text, so the label doesn't
-    /// slide up into a row that grew.
-    @ScaledMetric(relativeTo: .footnote)
-    private var statusPillRowHeight: CGFloat = MeterStatusPills.rowHeight
 
     /// The step the tour is actually showing — only drive the pills' tour
     /// override while the tour is presented, otherwise their reveal stays purely

@@ -62,9 +62,6 @@ struct StandInSceneView: View {
     /// Whether spot metering is active — the reticle shows only then.
     var isSpotActive: Bool
 
-    /// The readout badging the reticle, or `nil` when EV isn't riding it.
-    var evReadout: PreviewEVReadout?
-
     /// Called with a normalized point when the photographer taps to place a spot,
     /// so spot metering is actually *drivable* under the harness and not just
     /// visible. Defaults to doing nothing for the previews below.
@@ -76,7 +73,7 @@ struct StandInSceneView: View {
                 sceneBody(in: geometry.size)
                 grain
                 if isSpotActive {
-                    StandInReticle(readout: evReadout)
+                    StandInReticle()
                         .position(
                             x: (spot?.x ?? 0.5) * geometry.size.width,
                             y: (spot?.y ?? 0.5) * geometry.size.height
@@ -289,23 +286,18 @@ private struct Ridgeline: Shape {
     }
 }
 
-/// The harness' approximation of the spot reticle: corner brackets, a centre dot,
-/// and the EV badge beneath. Matched to `CameraPreviewView`'s UIKit reticle by
-/// eye, not by shared code — it exists so spot mode is inspectable in the
-/// Simulator, and is never what ships.
+/// The harness' approximation of the spot reticle: the shipped circle, redrawn in
+/// SwiftUI. Every dimension comes from the same `ReticleGeometry` the UIKit one
+/// strokes, so it exists to make spot mode inspectable in the Simulator without
+/// becoming a second opinion about what the reticle looks like.
 private struct StandInReticle: View {
-    let readout: PreviewEVReadout?
-
-    /// Read from the same `ReticleGeometry` the shipped UIKit reticle draws
-    /// from, so the harness cannot silently drift away from the bracket it is
-    /// standing in for.
-    private static let side = ReticleGeometry.side
-    private static let badgeGap = ReticleGeometry.badgeGap
-
     var body: some View {
-        ReticleBrackets()
-            .stroke(Color.appAccent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-            .frame(width: Self.side, height: Self.side)
+        Circle()
+            .strokeBorder(
+                Color.white.opacity(ReticleGeometry.rimOpacity),
+                lineWidth: ReticleGeometry.rimWidth
+            )
+            .frame(width: ReticleGeometry.diameter, height: ReticleGeometry.diameter)
             .overlay {
                 Circle()
                     .fill(Color.appAccent)
@@ -314,47 +306,10 @@ private struct StandInReticle: View {
                         height: ReticleGeometry.dotRadius * 2
                     )
             }
-            .shadow(color: .black.opacity(0.4), radius: 2)
-            // The badge hangs *below* the bracket without moving it: the bracket
-            // alone is what's centred on the metered point, as it is on-device.
-            // Offset from the bracket's own top edge, so the drop doesn't depend
-            // on the badge's height (which grows with Dynamic Type).
-            .overlay(alignment: .top) {
-                badge.offset(y: Self.side + Self.badgeGap)
-            }
+            // The same shadow the shipped rim carries, for the same reason: a
+            // white hairline vanishes against a blown-out sky.
+            .shadow(color: .black.opacity(0.6), radius: 3)
             .allowsHitTesting(false)
-    }
-
-    @ViewBuilder private var badge: some View {
-        if let readout, let value = readout.badgeValue {
-            Text(value)
-                .font(AppTypography.numeral(.caption))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(.black.opacity(0.55), in: Capsule())
-                .fixedSize()
-                // Named and qualified exactly as the shipped badge is: read as
-                // its own text this would be a bare "EV 12.3", with no hint of
-                // which read it describes or the ISO it is quoted at (ADR-0001).
-                .accessibilityElement()
-                .accessibilityLabel(readout.accessibilityLabel)
-                .accessibilityValue(readout.accessibilityValue)
-        }
-    }
-}
-
-/// The shipped reticle's four L-shaped corner brackets, stroked from the shared
-/// `ReticleGeometry` polylines rather than from its own copy of the numbers.
-private struct ReticleBrackets: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        for corner in ReticleGeometry.bracketPolylines(side: rect.width) {
-            guard let start = corner.first else { continue }
-            path.move(to: start)
-            path.addLines(Array(corner.dropFirst()))
-        }
-        return path
     }
 }
 

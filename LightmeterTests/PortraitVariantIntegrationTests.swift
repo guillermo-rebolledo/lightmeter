@@ -208,22 +208,63 @@ struct PortraitVariantIntegrationTests {
         }
     }
 
-    /// EV keeps its own voice wherever it lives — badging the reticle in spot,
-    /// as the quiet label in average — so a VoiceOver user can tell a point
-    /// reading from a whole-frame one, which sighted users read off the reticle.
-    @Test func evNamesWhichReadItIsInBothPatterns() async {
+    /// EV has one home now — the headline bar — and it reads the same in both
+    /// metering patterns, because it reports the scene rather than the point.
+    ///
+    /// This is what the reticle's silence buys: sighted users tell a spot read
+    /// from a whole-frame one by the reticle's presence, and a VoiceOver user by
+    /// the metering-pattern pill, rather than by two differently-named EV
+    /// elements that used to be the only difference between the two.
+    @Test func evReadsTheSceneInBothPatterns() async {
         let model = await meteringModel()
 
         model.setPattern(.spot)
         model.placeSpot(at: .frameCenter)
-        let spot = PreviewEVReadout(pattern: model.pattern, spot: model.spot, ev: model.ev)
-        #expect(spot?.badgeValue != nil)
+        let spot = EVHeadlineReadout(ev: model.ev, triangle: model.triangle)
 
         model.setPattern(.average)
-        let average = PreviewEVReadout(pattern: model.pattern, spot: model.spot, ev: model.ev)
-        #expect(average?.secondaryValue != nil)
+        let average = EVHeadlineReadout(ev: model.ev, triangle: model.triangle)
 
-        #expect(spot?.accessibilityLabel != average?.accessibilityLabel)
+        #expect(spot == average)
+        #expect(spot.accessibilityValue.contains("ISO 100"))
+    }
+
+    /// …and landscape still has an EV reading at all.
+    ///
+    /// The variant is portrait-only (#91), so #96 removed EV's two old homes —
+    /// the reticle badge and the secondary label — while only portrait gained a
+    /// bar in their place. Landscape keeps the quiet floating label, now reading
+    /// from the same derivation the bar renders, so the two orientations cannot
+    /// quote the scene differently.
+    @Test func landscapeKeepsAnEVReadingInBothPatterns() async {
+        let model = await meteringModel()
+
+        for pattern in [MeteringPattern.average, .spot] {
+            model.setPattern(pattern)
+            let readout = EVHeadlineReadout(ev: model.ev, triangle: model.triangle)
+            let label = LandscapeEVLabel(readout: readout)
+
+            #expect(readout.value.hasPrefix("EV "))
+            #expect(readout.accessibilityValue.contains("ISO 100"), "\(pattern)")
+            #expect(UIHostingController(rootView: label).view.intrinsicContentSize.width > 0)
+        }
+    }
+
+    /// The hero and the bar read the same leg a few inches apart while the
+    /// drawer is still on screen, so they must not describe it two ways — the
+    /// bar defers to `SolvedLegReadout` rather than deriving it again.
+    @Test func theBarAndTheDrawerHeroAgreeOnTheSolvedLeg() async {
+        let model = await meteringModel()
+
+        for claimed in [ExposureComponent.shutter, .aperture] {
+            model.selectChip(claimed)
+            let bar = EVHeadlineReadout(ev: model.ev, triangle: model.triangle)
+            let hero = SolvedLegReadout(triangle: model.triangle)
+
+            #expect(bar.solvedValue == hero.value)
+            #expect(bar.solvedAccessibilityValue == hero.accessibilityValue)
+            #expect(hero.accessibilityLabel.hasPrefix(bar.solvedAccessibilityLabel))
+        }
     }
 
     // MARK: - Guided tour off

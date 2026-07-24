@@ -16,6 +16,13 @@ struct FreezeButton: View {
     let canFreeze: Bool
     let onToggle: () -> Void
 
+    /// Whether the padlock draws its own glass surface. `false` inside the EV
+    /// headline bar, whose panel is already the surface separating it from the
+    /// scene — a glass circle on glass would read as a control stacked on a
+    /// control rather than as the bar's own chrome. The held state's accent ring
+    /// is kept either way: it is what says *held* beyond the glyph swap.
+    var hasSurface = true
+
     /// Apple's 44pt minimum tap target, scaled with Dynamic Type alongside the
     /// glyph it holds. Identical in both states, so freezing is a pure repaint.
     @ScaledMetric(relativeTo: .body) private var diameter: Double = 44
@@ -42,7 +49,7 @@ struct FreezeButton: View {
                 // The glass surface contributes no hit region, so pin the tappable
                 // area to the full circle (matching the status pills and gear).
                 .contentShape(.circle)
-                .modifier(GlassLockBackground(isHeld: isFrozen))
+                .modifier(GlassLockBackground(isHeld: isFrozen, hasSurface: hasSurface))
         }
         .buttonStyle(.plain)
         .disabled(canFreeze == false)
