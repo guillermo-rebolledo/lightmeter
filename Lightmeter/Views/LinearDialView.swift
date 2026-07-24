@@ -232,10 +232,24 @@ struct LinearDialView: View {
                 // movement is measured from — and ticks relative to — where the
                 // dial actually sits, not a stale index from a prior binding.
                 if dragPosition == nil {
+                    #if DEBUG
+                    // #112: a drag reaching here means the main thread delivered a
+                    // touch to the ruler. The first one, stamped against launch,
+                    // is the "draggable within the first frames?" answer — it lands
+                    // before or after any warmup stall the watchdog logs.
+                    LaunchDiagnostics.noteFirstDialDrag()
+                    #endif
                     dragAnchorIndex = selectedIndex
                     committedIndex = selectedIndex
                     haptics.prepare()
                 }
+
+                #if DEBUG
+                // #112: narrate the first drag's updates so "moved a little then
+                // stuck" reads as a cancelled gesture (updates stop) vs a value
+                // that clamps while the finger keeps moving (dx keeps climbing).
+                LaunchDiagnostics.noteDialDragChange(translationWidth: value.translation.width)
+                #endif
 
                 // Dragging back (left) advances toward higher values; one
                 // `stopSpacing` of travel is one stop.
@@ -254,6 +268,11 @@ struct LinearDialView: View {
                 onSelect(rounded)
             }
             .onEnded { _ in
+                #if DEBUG
+                // #112: pairs with `noteDialDragChange` — a low change count on a
+                // drag the finger never lifted from is the gesture being cancelled.
+                LaunchDiagnostics.noteFirstDialDragEnded()
+                #endif
                 // Every crossing was already reported in `onChanged`; this settles
                 // the fractional overshoot onto the snapped stop — with the
                 // instrument's shared spring, because a rule that eased to a stop

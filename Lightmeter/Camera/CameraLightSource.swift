@@ -75,7 +75,18 @@ final class CameraLightSource: NSObject, LightSource {
             self.activeContinuation = continuation
             sampler.setContinuation(continuation)
             if !self.session.isRunning {
+                #if DEBUG
+                // The #112 warmup: `startRunning()` is a known main-thread staller
+                // — and it is exactly why this whole block runs on `sessionQueue`,
+                // off the main thread. Bracketing it confirms on device that the
+                // call stays off main and shows how long it takes, so a stall the
+                // watchdog reports can be lined up against it (or ruled out of it).
+                LaunchDiagnostics.mark(.sessionStartRequested)
+                #endif
                 self.session.startRunning()
+                #if DEBUG
+                LaunchDiagnostics.mark(.sessionRunning)
+                #endif
             }
         }
 
@@ -198,6 +209,11 @@ private final class ReadingSampler: NSObject, AVCaptureVideoDataOutputSampleBuff
     /// queue, so it needs no synchronization of its own.
     private var diagnosticsSpans = ReadingSpans()
     private var didLogFirstFrame = false
+    /// Whether the first-frame launch marker (#112) has fired. Separate from
+    /// `didLogFirstFrame` because the two repros gate on different launch flags —
+    /// a launch-diagnostics run must still stamp first-frame even when reading
+    /// diagnostics are off.
+    private var didMarkLaunchFirstFrame = false
     #endif
 
     init(device: AVCaptureDevice) {
@@ -218,6 +234,16 @@ private final class ReadingSampler: NSObject, AVCaptureVideoDataOutputSampleBuff
         from connection: AVCaptureConnection
     ) {
         #if DEBUG
+        // #112: stamp when the first frame lands relative to launch, so preview
+        // readiness can be lined up against any main-thread stall the watchdog
+        // reports — the third candidate cause (a first-frame stall) the issue
+        // names. Gated separately from the reading-diagnostics first-frame log
+        // because the two repros ride different launch flags.
+        if LaunchDiagnostics.isEnabled, !didMarkLaunchFirstFrame {
+            didMarkLaunchFirstFrame = true
+            LaunchDiagnostics.mark(.firstFrame)
+        }
+
         // The issue's first question is whether the delegate fires at all on
         // device; log the very first frame so an empty run reads as "never
         // fired" rather than "fired but never moved".
