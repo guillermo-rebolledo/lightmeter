@@ -98,7 +98,9 @@ struct LinearDialView: View {
         }
         .frame(maxWidth: .infinity)
         .opacity(isBound ? 1 : 0)
-        .animation(.easeOut(duration: 0.15), value: isBound)
+        // The reveal fades in when the dial first gains a target — and collapses
+        // to a plain appearance under Reduce Motion, like every other motion here.
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: isBound)
         .contentShape(Rectangle())
         .gesture(dialGesture)
         .accessibilityElement()
@@ -160,16 +162,12 @@ struct LinearDialView: View {
     /// A single graduation: long for a full stop, short for a click between them,
     /// accented under the needle and faded by its distance from it.
     private func tickMark(_ index: Int) -> some View {
-        let isMarked = index == markedIndex
-
-        return Capsule()
+        Capsule()
             .frame(
-                width: isMarked ? 2 : 1,
+                width: index == markedIndex ? 2 : 1,
                 height: graduations.isMajor(index) ? majorTickHeight : minorTickHeight
             )
-            .foregroundStyle(isMarked
-                ? AnyShapeStyle(.tint)
-                : AnyShapeStyle(.white.opacity(fade(for: index))))
+            .foregroundStyle(markStyle(index))
     }
 
     /// A numbered graduation's marking, under its tick. Minor graduations draw
@@ -182,10 +180,17 @@ struct LinearDialView: View {
                 // in — it never needs to wrap or shrink, and fixing it is what
                 // keeps the offset row from squeezing it to a column of letters.
                 .fixedSize()
-                .foregroundStyle(index == markedIndex
-                    ? AnyShapeStyle(.tint)
-                    : AnyShapeStyle(.white.opacity(fade(for: index))))
+                .foregroundStyle(markStyle(index))
         }
+    }
+
+    /// How a graduation and its number are coloured: accent when it sits under the
+    /// needle, else white faded by how far it is from it. The tick and its number
+    /// share it so the two rows can never disagree about which mark is selected.
+    private func markStyle(_ index: Int) -> AnyShapeStyle {
+        index == markedIndex
+            ? AnyShapeStyle(.tint)
+            : AnyShapeStyle(.white.opacity(fade(for: index)))
     }
 
     /// The fixed needle the graduations sweep past: a caret above the rule,

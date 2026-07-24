@@ -36,6 +36,8 @@ struct MeterDialPanel: View {
     let advisories: [ExposureAdvisory]
     let isTourActive: Bool
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     /// The panel's inner padding. Wider at the sides than top and bottom: the rule
     /// fades out at both ends rather than stopping at a margin, so horizontal
     /// padding is doing less work here than it does on a row of controls.
@@ -76,13 +78,17 @@ struct MeterDialPanel: View {
                 // keep fitting.
                 .font(AppTypography.numeral(fixedSize: 26))
                 .foregroundStyle(.white)
-                // It counts rather than cutting: the value steps under the thumb
-                // as the rule sweeps, and every other numeral on the screen
-                // already transitions this way.
+                // It counts rather than cutting as the rule sweeps under the
+                // thumb — the numeric transition needs an ambient animation to
+                // drive it, which the spring below supplies. This is a value the
+                // photographer *moves*, so it springs (like the bar's solved leg)
+                // rather than easing the way a metered readout does (#91's split
+                // by causality), and it collapses to a snap under Reduce Motion.
                 .contentTransition(.numericText())
                 .scaledToFitOnOneLine()
         }
         .frame(maxWidth: .infinity)
+        .animation(reduceMotion ? nil : .snappy, value: model.dialValue)
         // Silent: the dial below is the same caption and the same value, on the
         // element a VoiceOver user can actually adjust.
         .accessibilityHidden(true)
