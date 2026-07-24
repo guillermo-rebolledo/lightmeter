@@ -39,17 +39,13 @@ struct CameraPreviewView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> PreviewView {
         #if DEBUG
-        // #112: bracket the main-thread preview-layer attach — assigning the
-        // session and standing up the `RotationCoordinator`, both on this first
-        // layout pass. It is the one warmup suspect that runs on main, so a stall
-        // the watchdog reports between these two marks is the swallowed-touch
-        // window pinned to *this* step rather than to session start (off main) or
-        // first-frame delivery. Inert unless launched with `-launch-diagnostics`.
+        // #112: bracket makeUIView. The session is no longer attached here — that
+        // is deferred until the session is running (see below) — so a stall between
+        // these marks would be the view/rotation setup, not the attach.
         LaunchDiagnostics.mark(.previewAttachBegan)
         defer { LaunchDiagnostics.mark(.previewAttachEnded) }
         #endif
         let view = PreviewView()
-        view.videoPreviewLayer.session = session
         view.videoPreviewLayer.videoGravity = .resizeAspectFill
 
         let tap = UITapGestureRecognizer(
@@ -60,31 +56,25 @@ struct CameraPreviewView: UIViewRepresentable {
 
         // Drive the preview connection's rotation from the device's horizon-level
         // preview angle so the live scene stays upright as the device rotates.
-        // The session is already attached, so the layer's connection exists.
         context.coordinator.startTrackingRotation(
             device: captureDevice,
             previewView: view
         )
+
+        // Bind the session only once it is running (#112). A visible preview layer
+        // attached to a still-starting session parks the main thread on the camera
+        // pipeline until the first frame — the multi-second warmup stall that froze
+        // the ruler — so the attach waits until frames are flowing.
+        context.coordinator.attachSessionWhenRunning(session, to: view)
         return view
     }
 
     func updateUIView(_ uiView: PreviewView, context: Context) {
-        // Only (re)attach the session when it actually changed. This runs on every
-        // SwiftUI update — and there are many during warmup — so re-assigning the
-        // same session each time is wasted work at best. At worst it touches the
-        // capture session's lock while `startRunning()` holds it on the session
-        // queue, which is where #112 caught the main thread blocking for ~2.4s
-        // during warmup, freezing the ruler. Assigning only on a real change keeps
-        // the render path off that lock once the session is attached.
-        if uiView.videoPreviewLayer.session !== session {
-            #if DEBUG
-            LaunchDiagnostics.measureMainThread("updateUIView.session") {
-                uiView.videoPreviewLayer.session = session
-            }
-            #else
-            uiView.videoPreviewLayer.session = session
-            #endif
-        }
+        // Idempotent: attaches the session the first time it is running, and re-arms
+        // only if the session identity changes. It never touches the layer's session
+        // while it is still starting, keeping the render path off the capture lock
+        // during warmup (#112).
+        context.coordinator.attachSessionWhenRunning(session, to: uiView)
         context.coordinator.onPlaceSpot = onPlaceSpot
         context.coordinator.isSpotActive = isSpotActive
         uiView.updateReticle(devicePoint: spot, visible: isSpotActive)
@@ -105,9 +95,55 @@ struct CameraPreviewView: UIViewRepresentable {
         private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
         private var rotationObservation: NSKeyValueObservation?
 
+        /// Observes `session.isRunning` so the preview layer's session is attached
+        /// only once frames are flowing (#112). Retained until the attach happens,
+        /// then released.
+        private var runningObservation: NSKeyValueObservation?
+
         init(onPlaceSpot: @escaping (CGPoint) -> Void, isSpotActive: Bool) {
             self.onPlaceSpot = onPlaceSpot
             self.isSpotActive = isSpotActive
+        }
+
+        /// Attaches `session` to the preview layer, but only once the session is
+        /// running. A visible preview layer bound to a still-starting session makes
+        /// the main thread wait on the camera pipeline until the first frame — the
+        /// #112 warmup stall that froze the ruler for seconds. Deferring the attach
+        /// until frames flow lets the preview light up without parking the main
+        /// thread. Idempotent: a no-op once attached, and it re-arms the observation
+        /// only while the session is not yet running.
+        func attachSessionWhenRunning(_ session: AVCaptureSession, to previewView: PreviewView) {
+            guard previewView.videoPreviewLayer.session !== session else { return }
+            if session.isRunning {
+                attach(session, to: previewView)
+                return
+            }
+            // `isRunning` flips on the session queue when `startRunning()` returns;
+            // hop to main for the CALayer mutation.
+            runningObservation = session.observe(\.isRunning, options: [.new]) { [weak self, weak previewView] session, _ in
+                guard session.isRunning, let self, let previewView else { return }
+                DispatchQueue.main.async { self.attach(session, to: previewView) }
+            }
+        }
+
+        private func attach(_ session: AVCaptureSession, to previewView: PreviewView) {
+            guard previewView.videoPreviewLayer.session !== session else { return }
+            runningObservation = nil
+            #if DEBUG
+            LaunchDiagnostics.measureMainThread("attachSession") {
+                previewView.videoPreviewLayer.session = session
+            }
+            #else
+            previewView.videoPreviewLayer.session = session
+            #endif
+            // The layer's connection only exists once the session is attached, so
+            // the rotation observation's `.initial` fire (in makeUIView, before this)
+            // had no connection to rotate. Apply the current horizon-level angle now
+            // so the preview starts upright without waiting for a device rotation.
+            if let angle = rotationCoordinator?.videoRotationAngleForHorizonLevelPreview {
+                Self.applyRotation(angle, to: previewView.videoPreviewLayer)
+                previewView.refreshReticle()
+            }
         }
 
         /// Begins driving the preview connection's rotation from the device's
