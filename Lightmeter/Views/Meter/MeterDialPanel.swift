@@ -51,14 +51,18 @@ struct MeterDialPanel: View {
         VStack(spacing: Self.rowSpacing) {
             headline
             MeterDialHost(model: model)
-            // The compensation track lives below a hairline, so it reads as a
+            // The compensation readout lives below a hairline, so it reads as a
             // second instrument on the same panel rather than as part of the ruler
-            // above it — the dial turns a leg, this one nudges the whole exposure.
+            // above it. It is on-demand: a compact, always-glanceable bias readout
+            // that summons the one ruler to drive compensation and dismisses it
+            // again — replacing the permanent slider that occupied this band even at
+            // zero. Shorter than the 44pt slider it replaces, so the panel holds its
+            // height.
             hairline
-            CompensationSliderView(
-                value: model.compensation,
+            CompensationReadout(
                 label: model.compensationLabel,
-                onChange: { model.setCompensation($0) }
+                isActive: model.isCompensationDialBound,
+                onTap: { model.bindCompensationDial() }
             )
             MeterAdvisoryFooter(advisories: advisories, isTourActive: isTourActive)
         }

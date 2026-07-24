@@ -29,7 +29,23 @@ struct EVHeadlineReadout: Equatable {
 
     /// The scene reading as shown — e.g. `"EV 12.3"`, or `"EV —"` before the
     /// first reading rather than a stale or invented number.
+    ///
+    /// The whole string, kept intact so VoiceOver reads a single value; the bar
+    /// typesets it as a small ``unit`` prefix over the large ``evValue`` number,
+    /// which is presentation only and leaves this — and the accessibility value
+    /// derived from it — unchanged.
     let value: String
+
+    /// The unit prefix the bar draws small before the number — always `"EV"`.
+    /// The bar splits the headline so `EV` reads as a quiet unit on the big
+    /// figure rather than a same-size word held a digit away from it; the split
+    /// is view typography, so the pieces live here but ``value`` stays whole.
+    static let unit = "EV"
+
+    /// The scene reading *without* its `EV` prefix — `"12.3"`, or the em-dash
+    /// placeholder while pending — so the bar can render the number as its own
+    /// large tabular run beside the small ``unit``.
+    let evValue: String
 
     /// Names the leg the engine answered for — `"Shutter"` in aperture-priority,
     /// `"Aperture"` in shutter-priority. Spoken rather than drawn: sighted readers
@@ -83,7 +99,8 @@ extension EVHeadlineReadout {
     init(ev: Double?, triangle: ExposureTriangle) {
         caption = "Exposure value @ ISO \(Self.referenceISO)"
         isPending = ev == nil
-        value = "EV \(ev.map(Self.label) ?? ExposureTriangle.pendingMarking)"
+        evValue = ev.map(Self.label) ?? ExposureTriangle.pendingMarking
+        value = "\(Self.unit) \(evValue)"
 
         // The solved leg is derived by `SolvedLegReadout`, not re-derived here:
         // the drawer's hero renders the same leg a few inches below this one, and

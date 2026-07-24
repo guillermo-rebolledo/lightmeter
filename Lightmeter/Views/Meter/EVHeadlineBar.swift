@@ -4,25 +4,25 @@ import SwiftUI
 /// portrait meter, reading scene brightness as the screen's largest value.
 ///
 /// Left to right: the freeze padlock · `EXPOSURE VALUE @ ISO 100` over the EV
-/// value · the solved exposure leg in accent over ISO · the settings gear.
+/// value · the solved exposure leg in accent · the settings gear.
 ///
 /// Three things about that arrangement are decisions rather than drawing:
 ///
 /// - **The caption carries the ISO 100 qualifier** (ADR-0001). The handoff labels
-///   the value bare `EXPOSURE VALUE` while putting an ISO readout in the same bar,
-///   which reads as EV-at-that-ISO and is wrong. The qualifier sits directly above
-///   the number and above the trailing ISO, so it cannot be read as belonging to
-///   the other one.
+///   the value bare `EXPOSURE VALUE`, which reads as EV-at-some-ISO and is wrong.
+///   The qualifier sits directly above the number, so the reference is read as
+///   part of the value rather than left to be inferred.
 /// - **The padlock and the gear are chrome, not readouts.** The mock has no home
 ///   for either, and the bar occupies the corner the gear used to float in, so
 ///   both are rehoused here — at the two ends, at their full 44pt targets, each
 ///   giving up the glass surface it wore over the preview (see
 ///   ``FreezeButton/hasSurface``): the panel is already the surface.
-/// - **The solved leg is a pure readout; ISO is a control.** The leg is the
-///   engine's answer and there is nothing to tap it for. ISO is an input, so
-///   tapping it points the ruler dial at the ISO scale — and wears an outline
-///   that says so, going accent while the dial is bound to it, which is the same
-///   selection-ring vocabulary the exposure chips use.
+/// - **The trailing end is the solved leg alone — a pure readout.** ISO used to
+///   ride here as the bar's one control, but it has moved down to the mode row
+///   beside aperture and shutter (the things the dial turns), so the bar's
+///   trailing end now shows only the engine's answer, in accent. That both puts
+///   ISO under the thumb with everything else it dials and recovers headline space
+///   the ISO control was spending.
 ///
 /// The bar's size is fixed by construction: it stretches to the width its caller
 /// insets it to, its two glyph ends are frames rather than symbols, and every
@@ -31,14 +31,14 @@ import SwiftUI
 ///
 /// **Four things compete for one row.** Who gives way is declared rather than
 /// left to the layout: the headline holds its width (`layoutPriority`) because it
-/// is the screen's hero, and the trailing pair — two short values with a generous
-/// shrink floor — absorbs the difference.
+/// is the screen's hero, and the trailing solved leg — one short value with a
+/// generous shrink floor — absorbs the difference.
 ///
 /// At the **accessibility text sizes there is no arrangement of one row that
 /// works**: `EXPOSURE VALUE @ ISO 100` alone is wider than any iPhone, so holding
 /// the row would crush the largest number on the screen down to `E…`. So the row
-/// is abandoned rather than crushed — see ``isStacked(at:)`` — and the trailing
-/// pair moves to a second line, where the caption is free to wrap and every value
+/// is abandoned rather than crushed — see ``Arrangement`` — and the solved leg
+/// moves to a second line, where the caption is free to wrap and every value
 /// keeps its size. The panel grows taller, which is the one dimension a floating
 /// panel over a viewfinder can afford to spend.
 struct EVHeadlineBar: View {
@@ -54,10 +54,10 @@ struct EVHeadlineBar: View {
     enum Arrangement {
         /// Padlock · headline · trailing pair · gear, all on one line.
         case row
-        /// Padlock · headline, then the trailing pair and the gear beneath. The
-        /// chrome follows the values down rather than staying on the first line,
+        /// Padlock · headline, then the solved leg and the gear beneath. The
+        /// chrome follows the value down rather than staying on the first line,
         /// so reading order — by eye or by VoiceOver — is still EV, solved leg,
-        /// ISO, gear.
+        /// gear.
         case stacked
 
         init(at size: DynamicTypeSize) {
@@ -95,21 +95,18 @@ struct EVHeadlineBar: View {
                 Spacer(minLength: 0)
 
                 if arrangement == .row {
-                    trailingPair
+                    solvedLeg
                     gear
                 }
             }
 
             if arrangement == .stacked {
-                // The second line: the trailing pair laid out across rather than
-                // down (the row it came from was abandoned for width, and
-                // spending the height twice over would push the panel into the
-                // frame), with the gear following it to the end of the line so
-                // the chrome is still read after the values rather than between
-                // them.
+                // The second line: the solved leg, with the gear following it to
+                // the end of the line so the chrome is still read after the value
+                // rather than between the value and the headline above it.
                 HStack(spacing: Self.itemSpacing) {
                     Spacer(minLength: 0)
-                    trailingPair
+                    solvedLeg
                     gear
                 }
             }
@@ -135,13 +132,8 @@ struct EVHeadlineBar: View {
         MeterSettingsGear(hasSurface: false)
     }
 
-    private var trailingPair: some View {
-        EVHeadlineTrailingPair(
-            readout: readout,
-            isDialBoundToISO: model.boundComponent == .iso,
-            arrangement: arrangement,
-            onSelectISO: { model.selectChip(.iso) }
-        )
+    private var solvedLeg: some View {
+        EVHeadlineSolvedLeg(readout: readout)
     }
 }
 
@@ -167,20 +159,42 @@ struct EVHeadlineValue: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             caption
+            value
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(readout.accessibilityLabel)
+        .accessibilityValue(readout.accessibilityValue)
+    }
 
-            Text(readout.value)
+    /// The headline number, typeset as a small `EV` unit over the large figure —
+    /// so `EV` reads as a prefix on the value rather than a same-size word held a
+    /// digit away from it. Baseline-aligned with a tight custom gap; the number
+    /// keeps its tabular figures and count-up transition, the whole pair scaling
+    /// as one line so tightening the label costs the readout none of its stability.
+    private var value: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Self.unitGap) {
+            Text(EVHeadlineReadout.unit)
+                // A quiet unit prefix, not a second headline: the caption tier the
+                // app names, so the eye lands on the number beside it.
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Text(readout.evValue)
                 // The screen's largest value, at the handoff's 30pt. Fixed, because
                 // 30pt already outruns any Dynamic Type size — what a large numeral
                 // needs from an accessibility size is to keep fitting.
                 .font(AppTypography.numeral(fixedSize: 30))
                 .foregroundStyle(.white)
                 .contentTransition(.numericText())
-                .scaledToFitOnOneLine(minimumScale: Self.minimumScale)
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(readout.accessibilityLabel)
-        .accessibilityValue(readout.accessibilityValue)
+        // The unit and the number scale together as one line, so the tight gap
+        // between them is preserved rather than shrinking one run and not the other.
+        .scaledToFitOnOneLine(minimumScale: Self.minimumScale)
     }
+
+    /// The gap between the small `EV` and the number — tight on purpose, so the
+    /// unit reads as belonging *to* the figure rather than floating a digit away.
+    private static let unitGap: CGFloat = 4
 
     @ViewBuilder private var caption: some View {
         let text = Text(readout.caption)
@@ -197,90 +211,31 @@ struct EVHeadlineValue: View {
     }
 }
 
-/// The bar's trailing end: the solved exposure leg in accent over the
-/// photographer's ISO — the complete exposure, readable without moving the eye
-/// off the instrument.
-struct EVHeadlineTrailingPair: View {
+/// The bar's trailing end: the solved exposure leg in accent — the engine's
+/// answer, readable without moving the eye off the instrument.
+///
+/// A pure readout: there is nothing to tap the engine's answer for. ISO used to
+/// share this end as the bar's one control, but it has moved to the mode row
+/// beside the other legs the dial turns, leaving the leg alone here.
+struct EVHeadlineSolvedLeg: View {
     let readout: EVHeadlineReadout
-    /// Whether the ruler dial is currently pointed at the ISO scale — an accent
-    /// outline, borrowed from the exposure chips' selection ring.
-    let isDialBoundToISO: Bool
 
-    /// Which arrangement of the bar this pair is sitting in — on a line of its
-    /// own it lays itself out across rather than down.
-    var arrangement = EVHeadlineBar.Arrangement.row
-
-    let onSelectISO: () -> Void
-
-    /// How far this pair may shrink. Deeper than the headline's floor on purpose:
-    /// these are two short, already-familiar values (`1/500`, `ISO 100`) and this
-    /// is the column that gives way when the row runs out of width.
+    /// How far the leg may shrink. Deeper than the headline's floor on purpose:
+    /// it is one short, already-familiar value (`1/500`, `f/16`) and it is the
+    /// column that gives way when the row runs out of width.
     static let minimumScale: CGFloat = 0.5
 
-    /// The ISO control's height. Smaller than the bar's 44pt ends — it is a value
-    /// that happens to be tappable rather than a piece of chrome — but tall enough
-    /// that the outline is a target and not a decoration.
-    @ScaledMetric(relativeTo: .caption) private var isoTargetHeight: CGFloat = 28
-
-    /// The ISO outline when the dial is pointed elsewhere: brighter than the
-    /// panel's own hairline rim, because this one has to say *tappable* rather
-    /// than merely find an edge.
-    private static let isoOutlineOpacity = 0.28
-
-    /// Down in the row, across on a line of its own.
-    private var layout: AnyLayout {
-        switch arrangement {
-        case .row: AnyLayout(VStackLayout(alignment: .trailing, spacing: 3))
-        case .stacked: AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 10))
-        }
-    }
-
     var body: some View {
-        layout {
-            Text(readout.solvedValue)
-                .font(AppTypography.numeral(.subheadline))
-                // The one accented value in the bar: the setting to dial into the
-                // camera, which is the only thing here the photographer acts on.
-                // A pure readout — there is nothing to tap the engine's answer for.
-                .foregroundStyle(.tint)
-                .contentTransition(.numericText())
-                .scaledToFitOnOneLine(minimumScale: Self.minimumScale)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(readout.solvedAccessibilityLabel)
-                .accessibilityValue(readout.solvedAccessibilityValue)
-
-            isoControl
-        }
-    }
-
-    /// ISO: the bar's one control that does not look like one, so it carries an
-    /// outline saying it can be tapped — accent while the dial is bound to it,
-    /// hairline otherwise. A stroke inside its own bounds, so binding the dial
-    /// costs no layout.
-    private var isoControl: some View {
-        Button(action: onSelectISO) {
-            Text("ISO \(readout.isoValue)")
-                .font(AppTypography.numeral(.caption))
-                .foregroundStyle(.secondary)
-                .contentTransition(.numericText())
-                .scaledToFitOnOneLine(minimumScale: Self.minimumScale)
-                .padding(.horizontal, 8)
-                .frame(minHeight: isoTargetHeight)
-                .contentShape(Capsule())
-                .overlay(
-                    Capsule().strokeBorder(
-                        isDialBoundToISO
-                            ? AnyShapeStyle(.tint)
-                            : AnyShapeStyle(.white.opacity(Self.isoOutlineOpacity)),
-                        lineWidth: 1
-                    )
-                )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(readout.isoAccessibilityLabel)
-        .accessibilityValue(readout.isoValue)
-        .accessibilityAddTraits(isDialBoundToISO ? .isSelected : [])
-        .accessibilityHint(EVHeadlineReadout.isoAccessibilityHint)
+        Text(readout.solvedValue)
+            .font(AppTypography.numeral(.subheadline))
+            // The one accented value in the bar: the setting to dial into the
+            // camera, which is the only thing here the photographer acts on.
+            .foregroundStyle(.tint)
+            .contentTransition(.numericText())
+            .scaledToFitOnOneLine(minimumScale: Self.minimumScale)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(readout.solvedAccessibilityLabel)
+            .accessibilityValue(readout.solvedAccessibilityValue)
     }
 }
 
