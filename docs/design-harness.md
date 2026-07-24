@@ -198,8 +198,12 @@ The tiers the meter is checked at are `large` (the default),
 `AppTypography.maximumDynamicTypeSize` holds), and
 `accessibility-extra-extra-extra-large` (`accessibility5` — which, because of
 that ceiling, should be indistinguishable from `accessibility3`). Set the size
-*before* launching; put it back with `content_size large` when you are done, or
-every later screenshot inherits it.
+*before* launching, and **put it back with `content_size large` when you are
+done**. It is device state, not app state: every later screenshot inherits it,
+and so does the test suite — the layout tests measure real
+`UIHostingController` fitting sizes, so a simulator left at an accessibility
+size fails `claimingPriorityNeverResizesTheChipsOrTheCard` by a third of a point
+with nothing wrong in the code.
 
 ## Forcing the pre-iOS-26 fallback
 

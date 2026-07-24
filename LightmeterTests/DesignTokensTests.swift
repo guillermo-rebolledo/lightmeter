@@ -56,7 +56,11 @@ struct DesignTokensTests {
     /// re-theming stays the one-line change it is advertised as — and the yellow
     /// this replaced cannot survive in a corner nobody re-screenshotted.
     @Test func noSurfaceNamesAnAccentColourOfItsOwn() throws {
-        try expectAbsent(Self.accentImpostors, exceptIn: Self.accentTokenPath)
+        try ShippingSources.expectAbsent(
+            Self.accentImpostors,
+            exceptIn: Self.accentTokenPath,
+            reason: "read Color.appAccent instead"
+        )
     }
 
     // MARK: - The numeric face
@@ -64,7 +68,10 @@ struct DesignTokensTests {
     /// The rounded face is gone. It was the meter's voice before the handoff, and
     /// a leftover `design: .rounded` is a readout that did not come along.
     @Test func theRoundedFaceIsGone() throws {
-        try expectAbsent(["design: .rounded", "withDesign(.rounded)"])
+        try ShippingSources.expectAbsent(
+            ["design: .rounded", "withDesign(.rounded)"],
+            reason: "the meter's face is the one AppTypography declares"
+        )
     }
 
     /// Numerals are *declared*, not patched. `.monospacedDigit()` widens the
@@ -73,8 +80,11 @@ struct DesignTokensTests {
     /// string's rhythm. Only the token file may name the face, so a new readout
     /// cannot reach for the half-measure.
     @Test func numeralsGoThroughTheTokenRatherThanPatchingDigits() throws {
-        try expectAbsent(["monospacedDigit", "design: .monospaced", "monospacedSystemFont"],
-                         exceptIn: Self.typographyTokenPath)
+        try ShippingSources.expectAbsent(
+            ["monospacedDigit", "design: .monospaced", "monospacedSystemFont"],
+            exceptIn: Self.typographyTokenPath,
+            reason: "declare the numeral through AppTypography instead"
+        )
     }
 
     // MARK: - The tiers
@@ -90,7 +100,7 @@ struct DesignTokensTests {
     /// only ever written for the fixed tiers — the large numerals and the couple
     /// of glyphs — so a literal below the floor is a tier that escaped it.
     @Test func nothingIsSetSmallerThanTheLabelFloor() throws {
-        for file in try shippingSourceFiles() {
+        for file in try ShippingSources.all() {
             let text = try String(contentsOf: URL(fileURLWithPath: file), encoding: .utf8)
             for size in try Self.pointSizes(in: text) {
                 #expect(
@@ -110,43 +120,32 @@ struct DesignTokensTests {
 
     // MARK: - Reading the sources back
 
-    /// Colours that would be a second accent. Deliberately broad — matching the
-    /// bare `.yellow` catches `Color.yellow` and `UIColor.yellow` alike — so
-    /// prose that merely *names* the old accent trips this too. A comment saying
-    /// "yellow" in a view is a comment describing a decision that view no longer
-    /// makes.
-    private static let accentImpostors = [".yellow", "systemYellow", ".orange", "systemOrange"]
+    /// Colours that would be a second accent — the yellow this replaced.
+    ///
+    /// Deliberately broad in one direction: matching the bare `.yellow` catches
+    /// `Color.yellow` and `UIColor.yellow` alike, and prose that merely *names*
+    /// the old accent trips it too, because a comment saying "yellow" in a view
+    /// is a comment describing a decision that view no longer makes.
+    ///
+    /// Deliberately narrow in the other: orange is *not* banned. #76's superseded
+    /// orange accent is dead, but orange is also a colour a warning could
+    /// legitimately want one day, and the accent's single-source guarantee is
+    /// already carried by the catalog-mirror test above rather than by a
+    /// blocklist.
+    private static let accentImpostors = [".yellow", "systemYellow"]
 
     private static let accentTokenPath = "Lightmeter/AppAccent.swift"
     private static let typographyTokenPath = "Lightmeter/AppTypography.swift"
 
-    /// Asserts no shipping source outside `exception` contains any of `tokens`.
-    private func expectAbsent(_ tokens: [String], exceptIn exception: String? = nil) throws {
-        let sources = try shippingSourceFiles()
-        // Sanity: an empty sweep would pass this vacuously.
-        #expect(sources.count > 20)
-        if let exception {
-            #expect(
-                sources.contains { $0.hasSuffix(exception) },
-                "the sweep missed \(exception) itself"
-            )
-        }
-
-        for path in sources where exception.map({ path.hasSuffix($0) }) != true {
-            let text = try String(contentsOf: URL(fileURLWithPath: path), encoding: .utf8)
-            for token in tokens {
-                #expect(
-                    text.contains(token) == false,
-                    "\(path) names \(token) itself — read the token instead"
-                )
-            }
-        }
-    }
-
-    /// Every explicit point size in `text`, from both the SwiftUI and the UIKit
-    /// spellings (`size:` / `ofSize:`).
+    /// Every explicit point size in `text` — `size:`, `ofSize:`, and the token's
+    /// own `fixedSize:`.
+    ///
+    /// Matched on the `size:` suffix rather than on a word boundary: `\b` cannot
+    /// match between the `d` and the `S` of `fixedSize`, so a leading-boundary
+    /// pattern would skip the one spelling this app writes most — leaving the
+    /// floor unenforced exactly where the tokens are declared.
     private static func pointSizes(in text: String) throws -> [CGFloat] {
-        let pattern = try Regex(#"\b(?:of)?[Ss]ize: (\d+(?:\.\d+)?)\b"#)
+        let pattern = try Regex(#"[Ss]ize: (\d+(?:\.\d+)?)\b"#)
         return try text.matches(of: pattern).map { match in
             let digits = try #require(match[1].substring, "unmatched capture group")
             return CGFloat(try #require(Double(digits)))
@@ -159,7 +158,7 @@ struct DesignTokensTests {
     private func assetColorComponents(
         atRepositoryPath relativePath: String
     ) throws -> [(red: CGFloat, green: CGFloat, blue: CGFloat)] {
-        let url = repositoryRoot.appending(path: relativePath)
+        let url = ShippingSources.repositoryRoot.appending(path: relativePath)
         let data = try Data(contentsOf: url)
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         let colors = try #require(json?["colors"] as? [[String: Any]], "no colours at \(relativePath)")
@@ -182,30 +181,5 @@ struct DesignTokensTests {
         var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
         try #require(color.getRed(&red, green: &green, blue: &blue, alpha: &alpha))
         return (red, green, blue, alpha)
-    }
-
-    /// The checkout the tests were built from — found from this file's own
-    /// compile-time path, the same way the glass sweep finds it.
-    private var repositoryRoot: URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()  // LightmeterTests
-            .deletingLastPathComponent()  // repository root
-    }
-
-    /// Every Swift file that ships: the app target and the widget extension.
-    private func shippingSourceFiles() throws -> [String] {
-        try ["Lightmeter", "LightmeterWidgets"].flatMap { target -> [String] in
-            let directory = repositoryRoot.appending(path: target, directoryHint: .isDirectory)
-            let enumerator = FileManager.default.enumerator(
-                at: directory,
-                includingPropertiesForKeys: nil
-            )
-            let contents = try #require(enumerator, "no sources at \(directory.path)")
-
-            return contents
-                .compactMap { $0 as? URL }
-                .filter { $0.pathExtension == "swift" }
-                .map(\.path)
-        }
     }
 }

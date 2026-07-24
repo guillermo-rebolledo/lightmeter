@@ -74,21 +74,11 @@ struct LiquidGlassFallbackTests {
     /// *)` to a new surface fails here rather than quietly reintroducing a branch
     /// no launch argument can reach.
     @Test func onlyTheGateFileBranchesOnIOS26() throws {
-        let sources = try shippingSourceFiles()
-        // Sanity: an empty sweep would pass this vacuously.
-        #expect(sources.count > 20)
-        // …and so would a sweep that somehow missed the gate file itself.
-        #expect(sources.contains { $0.hasSuffix(Self.gatePath) })
-
-        for path in sources where path.hasSuffix(Self.gatePath) == false {
-            let text = try String(contentsOf: URL(fileURLWithPath: path), encoding: .utf8)
-            for token in Self.gateOnlyTokens {
-                #expect(
-                    text.contains(token) == false,
-                    "\(path) reaches for \(token) itself — route it through GlassSurface instead"
-                )
-            }
-        }
+        try ShippingSources.expectAbsent(
+            Self.gateOnlyTokens,
+            exceptIn: Self.gatePath,
+            reason: "route it through GlassSurface instead"
+        )
     }
 
     /// The tokens that may only appear in the gate file: the iOS 26 glass API
@@ -112,30 +102,6 @@ struct LiquidGlassFallbackTests {
     /// The gate, by repository-relative path — not by file name, so a second file
     /// called `LiquidGlass.swift` somewhere else cannot exempt itself.
     private static let gatePath = "Lightmeter/Views/Glass/LiquidGlass.swift"
-
-    /// Every Swift file that ships: the app target and the widget extension,
-    /// found from this file's own compile-time path — the checkout the tests were
-    /// built from.
-    private func shippingSourceFiles() throws -> [String] {
-        let repositoryRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()  // Glass
-            .deletingLastPathComponent()  // LightmeterTests
-            .deletingLastPathComponent()  // repository root
-
-        return try ["Lightmeter", "LightmeterWidgets"].flatMap { target -> [String] in
-            let directory = repositoryRoot.appending(path: target, directoryHint: .isDirectory)
-            let enumerator = FileManager.default.enumerator(
-                at: directory,
-                includingPropertiesForKeys: nil
-            )
-            let contents = try #require(enumerator, "no sources at \(directory.path)")
-
-            return contents
-                .compactMap { $0 as? URL }
-                .filter { $0.pathExtension == "swift" }
-                .map(\.path)
-        }
-    }
 
     // MARK: - The forced path draws
 

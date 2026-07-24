@@ -20,13 +20,17 @@ enum AppTypography {
 
     /// A large numeral: the solved-leg hero, and the dial's selected value.
     ///
-    /// Fixed rather than relative, and paired with ``SwiftUI/View/scaledToFitOnOneLine(minimumScale:)``
-    /// at the call site. These sizes already exceed anything Dynamic Type would
-    /// ask for, so growing them buys no legibility and costs the layout its width
-    /// — what a large numeral needs from an accessibility size is to keep *fitting*,
-    /// which is what scale-to-fit gives it.
-    static func numeral(fixedSize size: CGFloat, weight: Font.Weight = .semibold) -> Font {
-        .system(size: size, weight: weight, design: numericDesign)
+    /// Fixed rather than relative. These sizes already exceed anything Dynamic
+    /// Type would ask for, so growing them buys no legibility and costs the
+    /// layout its width — what a large numeral needs from an accessibility size
+    /// is to keep *fitting*.
+    ///
+    /// Which is a call-site question, not this token's: a numeral in a slot it
+    /// can outgrow pairs this with
+    /// ``SwiftUI/View/scaledToFitOnOneLine(minimumScale:)``, and one with room to
+    /// spare — the dial's label, alone above a ruler — does not.
+    static func numeral(fixedSize size: CGFloat) -> Font {
+        .system(size: size, weight: .semibold, design: numericDesign)
     }
 
     /// A small numeral — the chip values, the preview's EV label, the
@@ -36,18 +40,17 @@ enum AppTypography {
         .system(style, design: numericDesign, weight: weight)
     }
 
-    /// The UIKit mirror of ``numeral(fixedSize:weight:)``, scaled by the text
-    /// style it is quoted against and capped at `maximumPointSize` — the same
+    /// The UIKit mirror of ``numeral(fixedSize:)``, scaled by the text style it is
+    /// quoted against and capped at `maximumPointSize` — the same
     /// hold-past-a-ceiling the SwiftUI side gets from ``maximumDynamicTypeSize``,
     /// spelled the way `UIFontMetrics` spells it.
     static func numeralFont(
         fixedSize size: CGFloat,
-        weight: UIFont.Weight = .semibold,
         relativeTo style: UIFont.TextStyle,
         maximumPointSize: CGFloat
     ) -> UIFont {
         UIFontMetrics(forTextStyle: style).scaledFont(
-            for: .monospacedSystemFont(ofSize: size, weight: weight),
+            for: .monospacedSystemFont(ofSize: size, weight: .semibold),
             maximumPointSize: maximumPointSize
         )
     }

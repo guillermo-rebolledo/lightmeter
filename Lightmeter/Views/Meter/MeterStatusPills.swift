@@ -207,8 +207,17 @@ struct MeterStatusPill: View {
                 Image(systemName: control.systemImage(in: model))
                     .foregroundStyle(.tint)
                 Text(control.value(in: model))
-                    .font(control.valueIsNumeric ? AppTypography.numeral(.footnote) : nil)
+                    // Both branches name a font: `.font(nil)` does not fall
+                    // through to the row's font below, it clears the value's
+                    // font to the default body.
+                    .font(control.valueIsNumeric
+                        ? AppTypography.numeral(.footnote)
+                        : .footnote.weight(.semibold))
                     .foregroundStyle(isOpen ? AnyShapeStyle(.tint) : AnyShapeStyle(.white))
+                    // Compensation steps live under the thumb, so it counts the
+                    // way every other numeric readout does. Inert on the pattern
+                    // pill, whose value is a word.
+                    .contentTransition(.numericText())
                     // The pair sits over the preview with no card to grow into,
                     // so an accessibility text size shrinks the value rather than
                     // pushing the pills off the frame.

@@ -50,9 +50,11 @@ sources back is what keeps that true.**
 - The label floor is 11pt, raised from the handoff's 9pt. 9pt tracked gold on
   glass, over a live scene, is not readable; the designer was working in a frame
   where 9px looked like about 11pt.
-- `DesignTokensTests` scans the shipping sources — the same shape as the one-gate
-  sweep in ADR-0002 — and fails on a second accent, a surviving rounded face, a
-  `.monospacedDigit()` patch, or a point size below the floor.
+- `DesignTokensTests` scans the shipping sources and fails on a second accent, a
+  surviving rounded face, a `.monospacedDigit()` patch, or a point size below the
+  floor. It is the second rule enforced that way, so the sweep itself moved into
+  a shared `ShippingSources` helper that ADR-0002's one-gate test now reads too —
+  a third shipping target is one edit, not two.
 
 ## Consequences
 
@@ -70,8 +72,11 @@ sources back is what keeps that true.**
 
 - The source scan is deliberately broad: it matches `.yellow` in a *comment* as
   well as in code. That is the intended strictness — prose naming the old accent
-  is prose describing a decision the file no longer makes — but it means an
-  unrelated `.orange` anywhere in the app trips a design test.
+  is prose describing a decision the file no longer makes — but it does mean a
+  design test can fail on a comment. It is *not* extended to orange (#76's
+  superseded accent): a blocklist is the wrong instrument for a colour a warning
+  might legitimately want, and the catalog-mirror test carries the single-source
+  guarantee anyway.
 - Like ADR-0002's sweep, it couples the suite to the repository layout: it reads
   the checkout the tests were compiled from.
 - The catalogs still exist as a second *place*, even though they are no longer a
