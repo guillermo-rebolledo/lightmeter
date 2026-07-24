@@ -217,10 +217,19 @@ final class MeterViewModel {
         isFrozen = false
     }
 
+    /// Whether ``toggleFreeze()`` would do anything: there is a reading to hold,
+    /// or one already held to release. Before the first reading there is nothing
+    /// to freeze.
+    ///
+    /// Published so the padlock can disable itself from the *same* condition the
+    /// toggle guards on, rather than each of its two homes restating it — which
+    /// is how a control ends up enabled for a state its action refuses.
+    var canFreeze: Bool { latestReading != nil || isFrozen }
+
     /// Holds the latest valid reading, or resumes accepting live source updates.
     /// Before the first reading there is nothing to hold, so this is a no-op.
     func toggleFreeze() {
-        guard latestReading != nil || isFrozen else { return }
+        guard canFreeze else { return }
         isFrozen.toggle()
     }
 

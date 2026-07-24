@@ -229,6 +229,44 @@ struct PortraitVariantIntegrationTests {
         #expect(spot.accessibilityValue.contains("ISO 100"))
     }
 
+    /// …and landscape still has an EV reading at all.
+    ///
+    /// The variant is portrait-only (#91), so #96 removed EV's two old homes —
+    /// the reticle badge and the secondary label — while only portrait gained a
+    /// bar in their place. Landscape keeps the quiet floating label, now reading
+    /// from the same derivation the bar renders, so the two orientations cannot
+    /// quote the scene differently.
+    @Test func landscapeKeepsAnEVReadingInBothPatterns() async {
+        let model = await meteringModel()
+
+        for pattern in [MeteringPattern.average, .spot] {
+            model.setPattern(pattern)
+            let readout = EVHeadlineReadout(ev: model.ev, triangle: model.triangle)
+            let label = LandscapeEVLabel(readout: readout)
+
+            #expect(readout.value.hasPrefix("EV "))
+            #expect(readout.accessibilityValue.contains("ISO 100"), "\(pattern)")
+            #expect(UIHostingController(rootView: label).view.intrinsicContentSize.width > 0)
+        }
+    }
+
+    /// The hero and the bar read the same leg a few inches apart while the
+    /// drawer is still on screen, so they must not describe it two ways — the
+    /// bar defers to `SolvedLegReadout` rather than deriving it again.
+    @Test func theBarAndTheDrawerHeroAgreeOnTheSolvedLeg() async {
+        let model = await meteringModel()
+
+        for claimed in [ExposureComponent.shutter, .aperture] {
+            model.selectChip(claimed)
+            let bar = EVHeadlineReadout(ev: model.ev, triangle: model.triangle)
+            let hero = SolvedLegReadout(triangle: model.triangle)
+
+            #expect(bar.solvedValue == hero.value)
+            #expect(bar.solvedAccessibilityValue == hero.accessibilityValue)
+            #expect(hero.accessibilityLabel.hasPrefix(bar.solvedAccessibilityLabel))
+        }
+    }
+
     // MARK: - Guided tour off
 
     /// The variant is judged cold: the tour never presents on this branch, even

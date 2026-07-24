@@ -48,9 +48,7 @@ struct MeterHUDCard: View {
                     if includesFreezeButton {
                         FreezeButton(
                             isFrozen: model.isFrozen,
-                            // Mirror `toggleFreeze`'s own guard so the button stays
-                            // enabled in every state the toggle accepts.
-                            canFreeze: model.latestReading != nil || model.isFrozen,
+                            canFreeze: model.canFreeze,
                             onToggle: model.toggleFreeze
                         )
                     }

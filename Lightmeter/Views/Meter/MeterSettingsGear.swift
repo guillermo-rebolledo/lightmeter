@@ -35,26 +35,13 @@ struct MeterSettingsGear: View {
                 .foregroundStyle(.tint)
                 .frame(width: Self.touchTarget, height: Self.touchTarget)
                 .contentShape(Rectangle())
-                .modifier(GearSurface(hasSurface: hasSurface))
+                // On the glass path, a small Liquid Glass circle; on the
+                // fallback, the bare tinted icon it has always been — and no
+                // surface at all inside the bar, whose panel is already one.
+                .glassSurface(.settingsGear, when: hasSurface)
         }
         .buttonStyle(.plain)
         .tint(.appAccent)
         .guidedTourAnchor(.settings)
-    }
-}
-
-/// The gear's surface, or none. Split out so the choice is a single, named
-/// decision rather than a `if` around the whole control.
-private struct GearSurface: ViewModifier {
-    let hasSurface: Bool
-
-    @ViewBuilder func body(content: Content) -> some View {
-        if hasSurface {
-            // On the glass path, a small Liquid Glass circle; on the fallback,
-            // the bare tinted icon it has always been.
-            content.glassSurface(.settingsGear)
-        } else {
-            content
-        }
     }
 }

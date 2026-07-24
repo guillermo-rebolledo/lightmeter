@@ -146,6 +146,27 @@ extension View {
         glassSurface(surface, isGlassEnabled: LiquidGlass.isEnabled)
     }
 
+    /// Renders `surface` only when `isPresent` — otherwise the receiver stands
+    /// alone, unsurfaced on both paths.
+    ///
+    /// The same control can need a surface in one home and none in another: the
+    /// freeze padlock and the settings gear float over the live preview in
+    /// landscape, where they need one, and ride the EV headline bar in portrait,
+    /// where the panel already separates them from the scene and a second glass
+    /// shape would read as a control stacked on a control.
+    ///
+    /// It lives here, beside the gate, rather than as an `if` at each call site
+    /// (ADR-0002): *whether* a surface is drawn is the same kind of decision as
+    /// *how*, and both belong to the one file that owns glass.
+    @ViewBuilder
+    func glassSurface(_ surface: GlassSurface, when isPresent: Bool) -> some View {
+        if isPresent {
+            glassSurface(surface)
+        } else {
+            self
+        }
+    }
+
     /// The seam under ``glassSurface(_:)``: the same rendering with the gate's
     /// answer passed in rather than read.
     ///
@@ -291,18 +312,11 @@ struct GlassLockBackground: ViewModifier {
     var hasSurface = true
 
     func body(content: Content) -> some View {
-        surfaced(content)
+        content
+            .glassSurface(.lock, when: hasSurface)
             .overlay(
                 Circle().strokeBorder(.tint.opacity(isHeld ? 0.9 : 0), lineWidth: 1.5)
             )
-    }
-
-    @ViewBuilder private func surfaced(_ content: Content) -> some View {
-        if hasSurface {
-            content.glassSurface(.lock)
-        } else {
-            content
-        }
     }
 }
 

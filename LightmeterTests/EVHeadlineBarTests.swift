@@ -157,7 +157,7 @@ struct EVHeadlineBarTests {
     /// and nothing wraps, clips, or crashes — SwiftUI simply squeezes the
     /// flexible column, and the largest number on the screen becomes `E…`. That
     /// is what the first draft of this bar did at `accessibility3`.
-    @Test(arguments: DynamicTypeSize.allCases.filter { EVHeadlineBar.isStacked(at: $0) == false })
+    @Test(arguments: DynamicTypeSize.allCases.filter { EVHeadlineBar.Arrangement(at: $0) == .row })
     func theRowFitsTheNarrowestBarAtEverySizeThatKeepsIt(_ size: DynamicTypeSize) async {
         let model = await meteringModel()
         let readout = EVHeadlineReadout(ev: model.ev, triangle: model.triangle)
@@ -169,6 +169,7 @@ struct EVHeadlineBarTests {
             ),
             at: size
         )
+        #expect(trailing > 0)
         let padlock = idealWidth(
             FreezeButton(isFrozen: false, canFreeze: true, onToggle: {}, hasSurface: false),
             at: size
@@ -201,11 +202,12 @@ struct EVHeadlineBarTests {
     /// default size too — where the row is exactly what the design wants.
     @Test func theBarReflowsExactlyAtTheAccessibilitySizes() {
         for size in DynamicTypeSize.allCases {
-            #expect(EVHeadlineBar.isStacked(at: size) == size.isAccessibilitySize, "\(size)")
+            let expected: EVHeadlineBar.Arrangement = size.isAccessibilitySize ? .stacked : .row
+            #expect(EVHeadlineBar.Arrangement(at: size) == expected, "\(size)")
         }
-        #expect(EVHeadlineBar.isStacked(at: .large) == false)
-        #expect(EVHeadlineBar.isStacked(at: .accessibility1))
-        #expect(EVHeadlineBar.isStacked(at: AppTypography.maximumDynamicTypeSize))
+        #expect(EVHeadlineBar.Arrangement(at: .large) == .row)
+        #expect(EVHeadlineBar.Arrangement(at: .accessibility1) == .stacked)
+        #expect(EVHeadlineBar.Arrangement(at: AppTypography.maximumDynamicTypeSize) == .stacked)
     }
 
     /// One view's ideal width at a given text size.

@@ -57,9 +57,9 @@ struct EVHeadlineReadout: Equatable {
 
     var solvedAccessibilityLabel: String { solvedCaption }
 
-    var solvedAccessibilityValue: String {
-        solvedValue == ExposureTriangle.pendingMarking ? Self.pendingSpoken : solvedValue
-    }
+    /// Deferred to ``SolvedLegReadout`` — the drawer's hero reads the same leg a
+    /// few inches below this one, and the two must not describe it differently.
+    let solvedAccessibilityValue: String
 
     var isoAccessibilityLabel: String { "ISO" }
 
@@ -84,8 +84,18 @@ extension EVHeadlineReadout {
         caption = "Exposure value @ ISO \(Self.referenceISO)"
         isPending = ev == nil
         value = "EV \(ev.map(Self.label) ?? ExposureTriangle.pendingMarking)"
+
+        // The solved leg is derived by `SolvedLegReadout`, not re-derived here:
+        // the drawer's hero renders the same leg a few inches below this one, and
+        // two derivations of one value is how they start disagreeing about the
+        // marking or about what "pending" is called. Only the caption differs —
+        // the hero says "Shutter @ ISO 100" because it is the answer's headline,
+        // and here the ISO 100 qualifier already belongs to the EV above.
+        let solved = SolvedLegReadout(triangle: triangle)
         solvedCaption = triangle.solved.caption
-        solvedValue = triangle.marking(of: triangle.solved) ?? ExposureTriangle.pendingMarking
+        solvedValue = solved.value ?? ExposureTriangle.pendingMarking
+        solvedAccessibilityValue = solved.accessibilityValue
+
         isoValue = triangle.iso.label
     }
 

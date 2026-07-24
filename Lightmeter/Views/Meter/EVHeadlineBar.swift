@@ -44,15 +44,25 @@ import SwiftUI
 struct EVHeadlineBar: View {
     let model: MeterViewModel
 
-    /// Whether the bar reflows onto two lines.
+    /// How the bar lays itself out — one row, or two.
     ///
     /// Keyed on the accessibility sizes rather than on measurement: `ViewThatFits`
     /// would decide from the row's *ideal* width, which for scale-to-fit text is
     /// its unscaled width — so it would abandon the row at the default size too,
     /// where the row is exactly what the design wants. Pure, so the rule is a fact
     /// a test can pin rather than an emergent property of a layout.
-    static func isStacked(at size: DynamicTypeSize) -> Bool {
-        size.isAccessibilitySize
+    enum Arrangement {
+        /// Padlock · headline · trailing pair · gear, all on one line.
+        case row
+        /// Padlock · headline, then the trailing pair and the gear beneath. The
+        /// chrome follows the values down rather than staying on the first line,
+        /// so reading order — by eye or by VoiceOver — is still EV, solved leg,
+        /// ISO, gear.
+        case stacked
+
+        init(at size: DynamicTypeSize) {
+            self = size.isAccessibilitySize ? .stacked : .row
+        }
     }
 
     /// The gap between the bar's four children, and the inset holding them off
@@ -69,14 +79,14 @@ struct EVHeadlineBar: View {
         EVHeadlineReadout(ev: model.ev, triangle: model.triangle)
     }
 
-    private var isStacked: Bool { Self.isStacked(at: dynamicTypeSize) }
+    private var arrangement: Arrangement { Arrangement(at: dynamicTypeSize) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Self.itemSpacing) {
             HStack(spacing: Self.itemSpacing) {
                 padlock
 
-                EVHeadlineValue(readout: readout, wrapsCaption: isStacked)
+                EVHeadlineValue(readout: readout, arrangement: arrangement)
                     // The hero holds its width; the trailing pair gives way.
                     .layoutPriority(1)
 
@@ -84,19 +94,24 @@ struct EVHeadlineBar: View {
                 // the trailing one keep their positions whatever either says.
                 Spacer(minLength: 0)
 
-                if isStacked == false {
+                if arrangement == .row {
                     trailingPair
+                    gear
                 }
-
-                MeterSettingsGear(hasSurface: false)
             }
 
-            if isStacked {
-                // The second line, laid out across rather than down: the row it
-                // came from was abandoned for width, and spending the height twice
-                // over would push the panel into the frame.
-                trailingPair
-                    .frame(maxWidth: .infinity, alignment: .trailing)
+            if arrangement == .stacked {
+                // The second line: the trailing pair laid out across rather than
+                // down (the row it came from was abandoned for width, and
+                // spending the height twice over would push the panel into the
+                // frame), with the gear following it to the end of the line so
+                // the chrome is still read after the values rather than between
+                // them.
+                HStack(spacing: Self.itemSpacing) {
+                    Spacer(minLength: 0)
+                    trailingPair
+                    gear
+                }
             }
         }
         .padding(.horizontal, Self.horizontalPadding)
@@ -108,19 +123,23 @@ struct EVHeadlineBar: View {
     private var padlock: some View {
         FreezeButton(
             isFrozen: model.isFrozen,
-            // Mirror `toggleFreeze`'s own guard so the padlock stays enabled in
-            // every state the toggle accepts.
-            canFreeze: model.latestReading != nil || model.isFrozen,
+            canFreeze: model.canFreeze,
             onToggle: model.toggleFreeze,
             hasSurface: false
         )
+    }
+
+    /// Both ends give up the glass surface they wear over the preview: the panel
+    /// is already the surface separating them from the scene.
+    private var gear: some View {
+        MeterSettingsGear(hasSurface: false)
     }
 
     private var trailingPair: some View {
         EVHeadlineTrailingPair(
             readout: readout,
             isDialBoundToISO: model.boundComponent == .iso,
-            isStacked: isStacked,
+            arrangement: arrangement,
             onSelectISO: { model.selectChip(.iso) }
         )
     }
@@ -134,13 +153,11 @@ struct EVHeadlineBar: View {
 struct EVHeadlineValue: View {
     let readout: EVHeadlineReadout
 
-    /// Whether the caption may wrap instead of shrinking to one line.
-    ///
-    /// `true` in the stacked layout, where an accessibility text size has already
-    /// made one line impossible: the qualifier is the whole reason the caption
-    /// exists (ADR-0001), so at the sizes where it cannot both fit and stay
-    /// readable, it takes the extra lines rather than the smaller type.
-    var wrapsCaption = false
+    /// Which arrangement of the bar this block is sitting in. Stacked, the caption
+    /// wraps instead of shrinking: an accessibility text size has already made one
+    /// line impossible, and the qualifier is the whole reason the caption exists
+    /// (ADR-0001), so it takes the extra lines rather than the smaller type.
+    var arrangement = EVHeadlineBar.Arrangement.row
 
     /// How far this block may shrink before it is failing at its job. The caption
     /// is the wider of the two lines, so this is effectively the caption's floor:
@@ -173,10 +190,9 @@ struct EVHeadlineValue: View {
             .textCase(.uppercase)
             .tracking(1.5)
 
-        if wrapsCaption {
-            text.fixedSize(horizontal: false, vertical: true)
-        } else {
-            text.scaledToFitOnOneLine(minimumScale: Self.minimumScale)
+        switch arrangement {
+        case .row: text.scaledToFitOnOneLine(minimumScale: Self.minimumScale)
+        case .stacked: text.fixedSize(horizontal: false, vertical: true)
         }
     }
 }
@@ -190,9 +206,9 @@ struct EVHeadlineTrailingPair: View {
     /// outline, borrowed from the exposure chips' selection ring.
     let isDialBoundToISO: Bool
 
-    /// Whether the pair is on a line of its own, which is where it lays itself
-    /// out across rather than down — see ``EVHeadlineBar/isStacked(at:)``.
-    var isStacked = false
+    /// Which arrangement of the bar this pair is sitting in — on a line of its
+    /// own it lays itself out across rather than down.
+    var arrangement = EVHeadlineBar.Arrangement.row
 
     let onSelectISO: () -> Void
 
@@ -206,11 +222,17 @@ struct EVHeadlineTrailingPair: View {
     /// that the outline is a target and not a decoration.
     @ScaledMetric(relativeTo: .caption) private var isoTargetHeight: CGFloat = 28
 
+    /// The ISO outline when the dial is pointed elsewhere: brighter than the
+    /// panel's own hairline rim, because this one has to say *tappable* rather
+    /// than merely find an edge.
+    private static let isoOutlineOpacity = 0.28
+
     /// Down in the row, across on a line of its own.
     private var layout: AnyLayout {
-        isStacked
-            ? AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 10))
-            : AnyLayout(VStackLayout(alignment: .trailing, spacing: 3))
+        switch arrangement {
+        case .row: AnyLayout(VStackLayout(alignment: .trailing, spacing: 3))
+        case .stacked: AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 10))
+        }
     }
 
     var body: some View {
@@ -247,7 +269,9 @@ struct EVHeadlineTrailingPair: View {
                 .contentShape(Capsule())
                 .overlay(
                     Capsule().strokeBorder(
-                        isDialBoundToISO ? AnyShapeStyle(.tint) : AnyShapeStyle(.white.opacity(0.28)),
+                        isDialBoundToISO
+                            ? AnyShapeStyle(.tint)
+                            : AnyShapeStyle(.white.opacity(Self.isoOutlineOpacity)),
                         lineWidth: 1
                     )
                 )
