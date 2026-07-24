@@ -183,6 +183,16 @@ struct ContentView: View {
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
+            // Yield the bottom edge to the app so the ruler — which sits in the
+            // lower third of the portrait layout, inside the home-indicator zone —
+            // recognises a drag immediately. Without this, iOS holds the first
+            // touch in the system-gesture gate to rule out a system swipe, and the
+            // gate's ~0.5s timeout is exactly the beat the dial felt dead for on
+            // launch (#112: confirmed on device by a "System gesture gate timed
+            // out" log coinciding with the first drag, with no main-thread stall).
+            // The home indicator still works; it just re-shows before its own
+            // swipe takes over, the standard trade for an edge-adjacent control.
+            .defersSystemGestures(on: .bottom)
             .tint(.appAccent)
             .task {
                 #if DEBUG
