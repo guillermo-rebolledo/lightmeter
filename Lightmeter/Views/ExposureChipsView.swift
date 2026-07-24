@@ -165,7 +165,7 @@ struct ExposureValueChip: View {
         .padding(.vertical, 11)
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity)
-        // `glassEffect` contributes no hit region, so pin the tappable area to
+        // The glass surface contributes no hit region, so pin the tappable area to
         // the full chip; without it, tapping a chip only registers on the
         // caption/value text.
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))

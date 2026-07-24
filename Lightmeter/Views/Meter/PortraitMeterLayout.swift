@@ -24,7 +24,7 @@ struct PortraitMeterLayout: View {
                 isTourActive: isTourActive
             )
             // Full-width drawer flush to the bottom safe area; the two-corner
-            // surface (glass on iOS 26, material + scrim on the floor) bleeds
+            // surface (glass, or material + scrim on the fallback) bleeds
             // down behind the home indicator, the content stays clear of it.
             .docked(edge: .bottom)
         }

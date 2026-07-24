@@ -39,7 +39,7 @@ struct FreezeButton: View {
                 // padlock is sized by its frame rather than by the symbol: the
                 // open and closed glyphs are not the same width.
                 .frame(width: diameter, height: diameter)
-                // `glassEffect` contributes no hit region, so pin the tappable
+                // The glass surface contributes no hit region, so pin the tappable
                 // area to the full circle (matching the status pills and gear).
                 .contentShape(.circle)
                 .modifier(GlassLockBackground(isHeld: isFrozen))

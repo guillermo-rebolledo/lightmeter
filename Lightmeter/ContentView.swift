@@ -105,9 +105,9 @@ struct ContentView: View {
                         .foregroundStyle(.tint)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
-                        // iOS 26: a small Liquid Glass circle; the fallback keeps
-                        // the bare tinted icon it has always been.
-                        .modifier(GlassCircleBackground())
+                        // On the glass path, a small Liquid Glass circle; on the
+                        // fallback, the bare tinted icon it has always been.
+                        .glassSurface(.settingsGear)
                 }
                 .buttonStyle(.plain)
                 .tint(.appAccent)

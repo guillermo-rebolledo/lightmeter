@@ -125,7 +125,7 @@ struct MeterStatusPills: View {
         }
         .animation(reduceMotion ? nil : .snappy, value: effectiveOpen)
         // The pills are glass among themselves, the same way the card's controls
-        // are, so adjacent surfaces blend as one system on iOS 26.
+        // are, so adjacent surfaces blend as one system on the glass path.
         .glassGroup()
     }
 
@@ -208,12 +208,12 @@ struct MeterStatusPill: View {
             // A minimal pill that is still a real target: the minimum is held by
             // the frame, not by fattening the visible capsule.
             .frame(minHeight: MeterStatusPills.rowHeight)
-            // `glassEffect` (unlike `background`) contributes no hit region, so
+            // The glass surface (unlike a background) contributes no hit region, so
             // pin the tappable area to the whole capsule — the same explicit
             // content shape the settings gear and the chips carry.
             .contentShape(Capsule())
             .modifier(PreviewFloatingBackground())
-            .modifier(GlassPillBackground(isActive: isOpen))
+            .glassSurface(.pill(isActive: isOpen))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(control.accessibilityLabel)
