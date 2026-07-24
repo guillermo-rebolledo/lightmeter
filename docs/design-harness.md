@@ -50,7 +50,10 @@ clever:
   therefore pins the light *and* the legs whose honest solve raises the warning
   it names — it cannot promise the warning otherwise. `handheld` and `tripod`
   only exist where the shutter is solved, so they also force aperture-priority;
-  `none` and `out-of-range` keep the mode you asked for. The backdrop is *not*
+  `none` and `out-of-range` keep the mode you asked for. A handholding warning in
+  shutter-priority is therefore **not a reachable state** — not a limit of the
+  harness but a fact about the engine, which raises only the range warning there.
+  The backdrop is *not*
   pinned, so pair a preset with `-harness-scene` if you want the scene to look
   like the light being read. Presets assume no compensation — pass
   `-harness-compensation` alongside one and you get whatever that solves to.
@@ -141,10 +144,12 @@ xcrun simctl launch "$UDID" "$BUNDLE_ID" \
 
 ## The named states
 
-Every state below is one launch — substitute it for step 4 above and screenshot
-as usual. They are named so a review can ask for one by name.
+Every state below is one launch. The arguments in each row go **after
+`-design-harness`** in step 4 above — without the enable flag nothing else has
+any effect, and the run falls back to an ordinary (camera-less) launch. States
+are named so a review can ask for one by name.
 
-| Name | What it shows | Launch arguments |
+| Name | What it shows | Arguments (after `-design-harness`) |
 | --- | --- | --- |
 | `default` | The ordinary screen: aperture-priority, average, live. The baseline. | *(none)* |
 | `pending` | Metering, before the first reading: the hero and the solved chip on their em-dash placeholder, no EV. | `-harness-pending` |

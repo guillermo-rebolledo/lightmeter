@@ -63,7 +63,7 @@ struct DesignHarnessConfiguration: Equatable {
         let scene = value(of: sceneOption, in: launchArguments)
             .flatMap(StandInScene.init(rawValue:)) ?? .blownSky
         let requestedMode = value(of: priorityOption, in: launchArguments)
-            .flatMap(PriorityMode.init(harnessArgument:)) ?? DesignHarnessMeterState.live.mode
+            .flatMap(PriorityMode.init(harnessArgument:)) ?? DesignHarnessMeterState.opening.mode
         let advisory = value(of: advisoryOption, in: launchArguments)
             .flatMap(DesignHarnessAdvisoryPreset.init(rawValue:)) ?? .auto
         // The preset has the last word on the light and the legs: it is a promise
@@ -80,9 +80,9 @@ struct DesignHarnessConfiguration: Equatable {
             mode: recipe?.mode ?? requestedMode,
             pattern: value(of: patternOption, in: launchArguments)
                 .flatMap(MeteringPattern.init(harnessArgument:))
-                ?? DesignHarnessMeterState.live.pattern,
+                ?? DesignHarnessMeterState.opening.pattern,
             compensation: value(of: compensationOption, in: launchArguments)
-                .flatMap(Double.init) ?? DesignHarnessMeterState.live.compensation,
+                .flatMap(Double.init) ?? DesignHarnessMeterState.opening.compensation,
             // A pending meter has no reading to hold, so the two are not
             // combinable; resolving it here keeps the launch from waiting on a
             // reading that is never coming.

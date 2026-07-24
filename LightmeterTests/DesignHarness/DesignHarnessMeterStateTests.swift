@@ -59,20 +59,22 @@ struct DesignHarnessMeterStateTests {
     /// An unqualified `-design-harness` has to reproduce the ordinary screen: the
     /// baseline shots were taken that way, and every named state is judged as a
     /// deviation from it.
+    ///
+    /// Asserted against a real view-model rather than against the same literals
+    /// twice — the harness restates those defaults, and this is what stops the
+    /// two drifting apart if the app's opening state ever moves.
     @Test func defaultsMatchTheViewModelsOwnOpeningState() async {
-        let state = DesignHarnessConfiguration.parse(launchArguments: ["-design-harness"])?.state
+        let configuration = DesignHarnessConfiguration.parse(launchArguments: ["-design-harness"])
+        let untouched = MeterViewModel(source: FakeLightSource())
 
-        #expect(state?.mode == .aperturePriority)
-        #expect(state?.pattern == .average)
-        #expect(state?.compensation == 0)
-        #expect(state?.isFrozen == false)
+        #expect(configuration?.state.mode == untouched.mode)
+        #expect(configuration?.state.pattern == untouched.pattern)
+        #expect(configuration?.state.compensation == untouched.compensation)
+        #expect(configuration?.state.isFrozen == untouched.isFrozen)
         // No preset, so the view-model keeps its own legs rather than the harness
         // freezing today's defaults into every screenshot.
-        #expect(state?.legs == nil)
-        #expect(
-            DesignHarnessConfiguration.parse(launchArguments: ["-design-harness"])?.isPending
-                == false
-        )
+        #expect(configuration?.state.legs == nil)
+        #expect(configuration?.isPending == false)
     }
 
     // MARK: - Priority mode

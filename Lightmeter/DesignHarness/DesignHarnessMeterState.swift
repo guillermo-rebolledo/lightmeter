@@ -151,8 +151,12 @@ struct DesignHarnessMeterState: Equatable {
     var legs: DesignHarnessLegs?
 
     /// The state an unqualified `-design-harness` launch gets: the view-model's
-    /// own opening state, so the baseline shots stay reproducible.
-    static let live = DesignHarnessMeterState(
+    /// own opening state, so the baseline shots stay reproducible. Restated here
+    /// rather than read off a view-model, because the parse is not on the main
+    /// actor; `defaultsMatchTheViewModelsOwnOpeningState` holds the two together.
+    ///
+    /// Not `live` — "live" already means *not frozen* on this screen.
+    static let opening = DesignHarnessMeterState(
         mode: .aperturePriority,
         pattern: .average,
         compensation: 0,
