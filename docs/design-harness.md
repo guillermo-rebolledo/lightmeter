@@ -11,6 +11,11 @@ and draws a **stand-in scene** behind the UI in place of the camera preview.
 Nothing downstream is special-cased: `MeterViewModel` and `ExposureEngine` run
 exactly the code they run on a phone.
 
+Further arguments name the *state* the screen is in — priority mode, metering
+pattern, compensation, freeze, which advisory is showing, and the moment before
+any reading has arrived — so a screenshot shows a state that was chosen rather
+than one that was stumbled into. See [the named states](#the-named-states).
+
 Everything under `Lightmeter/DesignHarness/` is wrapped in `#if DEBUG` at file
 scope, so a Release build compiles none of it. The only production-code
 concession is `ContentView`'s optional `source:` parameter, which is `nil` in
@@ -23,9 +28,34 @@ Release and leaves behaviour exactly as it was.
 | `-design-harness` | *(flag)* — nothing else has any effect without it | off |
 | `-harness-scene` | `blown-sky`, `dim-interior`, `mixed-contrast` | `blown-sky` |
 | `-harness-ev` | any number — the scene's EV@ISO 100 | the scene's own nominal EV |
+| `-harness-priority` | `aperture`, `shutter` | `aperture` |
+| `-harness-pattern` | `average`, `spot` | `average` |
+| `-harness-compensation` | any number of stops, clamped to ±3 | `0` |
+| `-harness-frozen` | *(flag)* — hold the first reading | live |
+| `-harness-pending` | *(flag)* — never deliver a reading | off |
+| `-harness-advisory` | `none`, `handheld`, `tripod`, `out-of-range` | whatever the scene produces |
 
 A mistyped value falls back rather than failing to launch, so a typo still gives
 a running screen to look at.
+
+The state options are set through `MeterViewModel`'s own entry points, on a
+running meter, immediately after it starts — the same calls a tap would make.
+Nothing the harness reaches is a state the UI could not.
+
+Two options interact with the others, and both are documented rather than
+clever:
+
+- **`-harness-advisory` outranks `-harness-ev` and `-harness-priority`.**
+  Advisories are derived from the solve; there is no setter for them. A preset
+  therefore pins the light *and* the legs whose honest solve raises the warning
+  it names — it cannot promise the warning otherwise. `handheld` and `tripod`
+  only exist where the shutter is solved, so they also force aperture-priority;
+  `none` and `out-of-range` keep the mode you asked for. The backdrop is *not*
+  pinned, so pair a preset with `-harness-scene` if you want the scene to look
+  like the light being read. Presets assume no compensation — pass
+  `-harness-compensation` alongside one and you get whatever that solves to.
+- **`-harness-pending` outranks `-harness-frozen`.** There is no reading to
+  hold, so the freeze is dropped rather than left waiting for one.
 
 ## The reference shots
 
@@ -109,6 +139,39 @@ xcrun simctl launch "$UDID" "$BUNDLE_ID" \
   -design-harness -harness-scene mixed-contrast -harness-ev 9.5
 ```
 
+## The named states
+
+Every state below is one launch — substitute it for step 4 above and screenshot
+as usual. They are named so a review can ask for one by name.
+
+| Name | What it shows | Launch arguments |
+| --- | --- | --- |
+| `default` | The ordinary screen: aperture-priority, average, live. The baseline. | *(none)* |
+| `pending` | Metering, before the first reading: the hero and the solved chip on their em-dash placeholder, no EV. | `-harness-pending` |
+| `frozen` | A held reading — the padlock closed. | `-harness-frozen` |
+| `spot` | Spot metering with the reticle at the frame center, EV on the badge. | `-harness-pattern spot` |
+| `shutter-priority` | The shutter locked and the aperture solved — the mirror of the default. | `-harness-priority shutter` |
+| `compensated` | +1 EV of deliberate bias, on the pill and in the solve. | `-harness-compensation 1.0` |
+| `no-advisories` | A comfortable solve, so the advisory row is deliberately empty. | `-harness-advisory none` |
+| `handheld-risk` | The soft warning: a solve between 1/60 s and 1/15 s. | `-harness-advisory handheld -harness-scene mixed-contrast` |
+| `tripod` | The strong warning: a one-second solve. | `-harness-advisory tripod -harness-scene dim-interior` |
+| `out-of-range` | The solved leg off the end of its scale — the range warning. | `-harness-advisory out-of-range` |
+| `worst-case` | Everything at once, over the hardest backdrop: shutter-priority, spot, +1 EV, frozen. | `-harness-scene mixed-contrast -harness-priority shutter -harness-pattern spot -harness-compensation 1.0 -harness-frozen` |
+
+For example, the last one in full:
+
+```sh
+xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
+xcrun simctl launch "$UDID" "$BUNDLE_ID" -design-harness \
+  -harness-scene mixed-contrast \
+  -harness-priority shutter \
+  -harness-pattern spot \
+  -harness-compensation 1.0 \
+  -harness-frozen
+sleep 3
+xcrun simctl io "$UDID" screenshot worst-case.png
+```
+
 ## Running it from Xcode instead
 
 Product ▸ Scheme ▸ Edit Scheme ▸ Run ▸ Arguments, and add
@@ -123,4 +186,8 @@ them to get an ordinary run back.
   by eye rather than by shared code.
 - **Live light.** The scene EV is fixed for the launch, so the meter reads a
   steady value. Freeze, priority, compensation and the dial are all fully
-  drivable on top of it.
+  drivable on top of it — from the launch arguments above, or by hand.
+- **The transitions between states.** Each launch *arrives* in its state; nothing
+  here reproduces the animation into it. A state that only exists mid-gesture —
+  a dial being dragged, a pill's editor revealed — still has to be reached by
+  hand.
