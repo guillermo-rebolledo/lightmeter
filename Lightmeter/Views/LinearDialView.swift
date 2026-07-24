@@ -247,27 +247,21 @@ struct LinearDialView: View {
                 guard rounded != committedIndex else { return }
 
                 // A tick per stop actually crossed, so a fast flick over several
-                // stops feels like several detents, not one.
-                for _ in 0..<abs(rounded - committedIndex) {
-                    haptics.selectionChanged()
-                }
-                haptics.prepare()
+                // stops feels like several detents, not one — the same detent
+                // haptic the compensation track fires.
+                haptics.clickDetents(crossing: abs(rounded - committedIndex))
                 committedIndex = rounded
                 onSelect(rounded)
             }
             .onEnded { _ in
                 // Every crossing was already reported in `onChanged`; this settles
-                // the fractional overshoot onto the snapped stop — with a spring,
-                // because a rule that eased to a stop would read as a slider and
-                // one that snapped instantly would read as a picker. A flicked
-                // dial should arrive like something with mass.
-                withAnimation(reduceMotion ? nil : Self.settle) { dragPosition = nil }
+                // the fractional overshoot onto the snapped stop — with the
+                // instrument's shared spring, because a rule that eased to a stop
+                // would read as a slider and one that snapped instantly would read
+                // as a picker. A flicked dial should arrive like something with mass.
+                withAnimation(reduceMotion ? nil : InstrumentFeel.settle) { dragPosition = nil }
             }
     }
-
-    /// How a flicked rule comes to rest. Just enough bounce to feel like mass,
-    /// short enough that the value under the needle is never in doubt.
-    private static let settle = Animation.spring(response: 0.32, dampingFraction: 0.72)
 
     // MARK: - Helpers
 

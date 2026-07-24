@@ -54,10 +54,13 @@ struct CompensationSliderView: View {
     /// way, as the ruler dial's, so compensation and the dial click identically.
     @State private var haptics = UISelectionFeedbackGenerator()
 
-    /// The full bias range, in stops. Fixed at ±3 — compensation steps in thirds
-    /// regardless of the chosen exposure increment.
-    private let extent = 3.0
-    private let step = 1.0 / 3
+    /// The width-agnostic value model — the single source of the ±3 extent, the
+    /// third-stop grid, and the snapping the view needs before it knows the track's
+    /// width (the tick range, the adjustable action). The facts about compensation
+    /// live in `CompensationSlider`'s own defaults, not restated here; a
+    /// width-specific instance is built from those defaults where placement needs
+    /// one.
+    private let geometry = CompensationSlider(trackWidth: 1)
 
     /// The visible track's thickness, and the knob riding it. The knob is a real
     /// target on its own; the band around it (below) makes the whole rule one.
@@ -68,10 +71,6 @@ struct CompensationSliderView: View {
     /// and hit area fill 44pt so the knob is grabbable without aiming at it — the
     /// AC's padded hit target.
     private let hitHeight: CGFloat = 44
-
-    /// The vertical drift at which the drag's sensitivity halves — passed into the
-    /// value model, and the knee of the precise-adjustment curve.
-    private let sensitivityFalloff: CGFloat = 44
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -85,9 +84,11 @@ struct CompensationSliderView: View {
         // adjustable action instead — stepping a third at a time, the same grain
         // the knob snaps to.
         .accessibilityAdjustableAction { direction in
+            // Stepping a third snaps and clamps through the value model, so a step
+            // at an end stays on the end rather than running past it.
             switch direction {
-            case .increment: onChange(clampToThird(value + step))
-            case .decrement: onChange(clampToThird(value - step))
+            case .increment: onChange(geometry.snap(value + geometry.step))
+            case .decrement: onChange(geometry.snap(value - geometry.step))
             @unknown default: break
             }
         }
@@ -126,12 +127,7 @@ struct CompensationSliderView: View {
     private var track: some View {
         GeometryReader { proxy in
             let width = proxy.size.width
-            let slider = CompensationSlider(
-                extent: extent,
-                step: step,
-                trackWidth: max(width - knobDiameter, 1),
-                sensitivityFalloff: sensitivityFalloff
-            )
+            let slider = CompensationSlider(trackWidth: max(width - knobDiameter, 1))
             let midY = hitHeight / 2
 
             ZStack(alignment: .leading) {
@@ -167,7 +163,7 @@ struct CompensationSliderView: View {
 
             // Whole-EV ticks, the centre one taller and brighter — the scale's
             // graduations, the way the ruler numbers its full stops.
-            ForEach(-Int(extent)...Int(extent), id: \.self) { stop in
+            ForEach(-Int(geometry.extent)...Int(geometry.extent), id: \.self) { stop in
                 let isZeroMark = stop == 0
                 Capsule()
                     .fill(.white.opacity(isZeroMark ? 0.55 : 0.28))
@@ -209,28 +205,20 @@ struct CompensationSliderView: View {
                 let index = slider.detentIndex(for: newValue)
                 guard index != committedIndex else { return }
 
-                // One tick per third actually crossed, so a flick across several
-                // stops feels like several detents — the ruler's rule, kept here so
-                // the two controls click the same.
-                for _ in 0..<abs(index - committedIndex) {
-                    haptics.selectionChanged()
-                }
-                haptics.prepare()
+                // One tick per third actually crossed — the same detent haptic the
+                // ruler fires, so the two controls click as one instrument.
+                haptics.clickDetents(crossing: abs(index - committedIndex))
                 committedIndex = index
                 onChange(slider.snap(newValue))
             }
             .onEnded { _ in
-                // Settle the fractional overshoot onto the snapped third with a
-                // spring — the knob arrives like something with mass rather than
-                // easing (a slider) or jumping (a picker) — and snap instantly
-                // under Reduce Motion.
-                withAnimation(reduceMotion ? nil : Self.settle) { dragValue = nil }
+                // Settle the fractional overshoot onto the snapped third with the
+                // instrument's shared spring — the knob arrives like something with
+                // mass rather than easing (a slider) or jumping (a picker) — and
+                // snaps instantly under Reduce Motion.
+                withAnimation(reduceMotion ? nil : InstrumentFeel.settle) { dragValue = nil }
             }
     }
-
-    /// How the knob comes to rest — the ruler dial's settle, so a released
-    /// compensation knob and a released dial arrive the same way.
-    private static let settle = Animation.spring(response: 0.32, dampingFraction: 0.72)
 
     // MARK: - Geometry helpers
 
@@ -244,15 +232,7 @@ struct CompensationSliderView: View {
     /// disc stays fully on the track at ±3.
     private func knobCenterX(for value: Double, width: CGFloat) -> CGFloat {
         let usable = max(width - knobDiameter, 0)
-        let slider = CompensationSlider(extent: extent, step: step, trackWidth: usable)
-        return knobDiameter / 2 + slider.position(for: value) * usable
-    }
-
-    /// Clamps a stepped value onto the range's third-stop grid — the adjustable
-    /// action's guard, so stepping at an end stays on the end rather than past it.
-    private func clampToThird(_ value: Double) -> Double {
-        let slider = CompensationSlider(extent: extent, step: step, trackWidth: 1)
-        return slider.snap(value)
+        return knobDiameter / 2 + geometry.position(for: value) * usable
     }
 }
 
