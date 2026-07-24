@@ -186,5 +186,29 @@ enum DesignHarness {
     static var backdropScene: StandInScene {
         configuration?.scene ?? .blownSky
     }
+
+    // MARK: - Forcing the pre-iOS-26 fallback
+
+    /// The flag that forces ``LiquidGlass/isEnabled`` off, so every glass surface
+    /// in the app renders its pre-iOS-26 fallback on an OS that has glass.
+    ///
+    /// Deliberately **not** behind `-design-harness`: the fallback is worth
+    /// looking at over the real camera on a device as well as over a stand-in
+    /// scene in the Simulator, and pairing the two flags is what produces the
+    /// side-by-side reference shots.
+    static let forceGlassFallbackFlag = "-force-glass-fallback"
+
+    /// Whether this launch asked for the fallback rendering. Resolved once, at
+    /// first touch, so the gate cannot flip mid-session and leave half the
+    /// screen on each path.
+    static let forcesGlassFallback = forcesGlassFallback(
+        launchArguments: ProcessInfo.processInfo.arguments
+    )
+
+    /// The parse, split from the launch-time constant above so the contract is
+    /// testable without launching anything.
+    static func forcesGlassFallback(launchArguments: [String]) -> Bool {
+        launchArguments.contains(forceGlassFallbackFlag)
+    }
 }
 #endif

@@ -16,10 +16,14 @@ pattern, compensation, freeze, which advisory is showing, and the moment before
 any reading has arrived — so a screenshot shows a state that was chosen rather
 than one that was stumbled into. See [the named states](#the-named-states).
 
+A further argument, `-force-glass-fallback`, renders every Liquid Glass surface
+on its pre-iOS-26 fallback path — see [forcing the fallback](#forcing-the-pre-ios-26-fallback).
+
 Everything under `Lightmeter/DesignHarness/` is wrapped in `#if DEBUG` at file
-scope, so a Release build compiles none of it. The only production-code
-concession is `ContentView`'s optional `source:` parameter, which is `nil` in
-Release and leaves behaviour exactly as it was.
+scope, so a Release build compiles none of it. There are two production-code
+concessions, both inert in Release: `ContentView`'s optional `source:` parameter,
+which is `nil`, and the glass gate's forced-off check, which compiles to a
+constant `false`.
 
 ## Launch arguments
 
@@ -34,6 +38,7 @@ Release and leaves behaviour exactly as it was.
 | `-harness-frozen` | *(flag)* — hold the first reading | live |
 | `-harness-pending` | *(flag)* — never deliver a reading | off |
 | `-harness-advisory` | `none`, `handheld`, `tripod`, `out-of-range` | whatever the scene produces |
+| `-force-glass-fallback` | *(flag)* — render the pre-iOS-26 fallback. **Stands alone**: works without `-design-harness` | glass, where the OS has it |
 
 A mistyped value falls back rather than failing to launch, so a typo still gives
 a running screen to look at.
@@ -162,6 +167,7 @@ are named so a review can ask for one by name.
 | `tripod` | The strong warning: a one-second solve. | `-harness-advisory tripod -harness-scene dim-interior` |
 | `out-of-range` | The solved leg off the end of its scale — the range warning. | `-harness-advisory out-of-range` |
 | `worst-case` | Everything at once, over the hardest backdrop: shutter-priority, spot, +1 EV, frozen. | `-harness-scene mixed-contrast -harness-priority shutter -harness-pattern spot -harness-compensation 1.0 -harness-frozen` |
+| `fallback` | Every glass surface on its pre-iOS-26 path. Composes with any row above. | `-force-glass-fallback` |
 
 For example, the last one in full:
 
@@ -176,6 +182,71 @@ xcrun simctl launch "$UDID" "$BUNDLE_ID" -design-harness \
 sleep 3
 xcrun simctl io "$UDID" screenshot worst-case.png
 ```
+
+## Forcing the pre-iOS-26 fallback
+
+The standing project rule is that every Liquid Glass surface ships a complete,
+intentional fallback, and the deployment target is iOS 17. But only iOS 26
+Simulator runtimes are installed and there is no iOS 17/18 device to hand — so
+the fallback path was, until now, verified by nobody.
+
+`-force-glass-fallback` fixes that. It turns off the app's **single glass gate**,
+so every surface renders its fallback on an iOS 26 Simulator:
+
+```sh
+xcrun simctl launch "$UDID" "$BUNDLE_ID" \
+  -design-harness -harness-scene blown-sky -force-glass-fallback
+```
+
+The flag stands alone — it needs no `-design-harness`, so the fallback is equally
+inspectable over the real camera on a device. It is `#if DEBUG` only: a Release
+build compiles a constant `false` in its place and has no way to reach the forced
+path.
+
+### One gate
+
+All of it rests on there being exactly one decision to force.
+`Lightmeter/Views/Glass/LiquidGlass.swift` owns it:
+
+- `LiquidGlass.isEnabled` — the only question anything asks. `false` below
+  iOS 26, and `false` on iOS 26 when the flag is set.
+- `GlassSurface` — every glass surface in the app as data (pill, lock, chip,
+  circle, group, drawer), rendered by one `glassSurface(_:)` helper that asks the
+  gate once.
+
+No other file in the app or the widget extension mentions iOS 26 or the glass
+API — not even in a comment — and
+`LiquidGlassFallbackTests.onlyTheGateFileBranchesOnIOS26` scans both targets'
+sources to keep it that way. The same suite renders every surface on both paths
+and asserts that forcing the gate off actually changes what is drawn, and that
+the surfaces which must be visible on their own draw something the bare content
+does not. The fallback rule is enforced rather than assumed.
+
+Adding a surface: add a `GlassSurface` case with both paths, give it a
+`GlassSurface.Kind`, and add an instance to `GlassSurface.all` — `kind` is an
+exhaustive switch and `allCoversEverySurface` fails until the list is complete,
+so the new surface cannot slip past the tests.
+
+### What this proves, and what it does not
+
+It proves **iOS 26 running the fallback code path**. It does *not* prove **iOS 17
+rendering it**: `.ultraThinMaterial` and the rest of the material stack are
+rendered by the OS, and their exact blur radius, vibrancy, and contrast differ
+between releases. The fallback's true appearance on the deployment target
+therefore stays unverified until it is run on an iOS 17/18 device or runtime.
+
+What the forced path *does* catch: an empty or broken `else`, a surface that
+disappears into the scene behind it, a control that loses its hit region or its
+selection ring, and text that stops being legible without the glass. Those are
+the failures the rule exists to prevent.
+
+### The fallback reference shots
+
+The same three scenes as above, with the gate forced off:
+
+| `blown-sky` | `dim-interior` | `mixed-contrast` |
+| --- | --- | --- |
+| ![Blown sky, fallback](design-harness/meter-fallback-blown-sky.png) | ![Dim interior, fallback](design-harness/meter-fallback-dim-interior.png) | ![Mixed contrast, fallback](design-harness/meter-fallback-mixed-contrast.png) |
 
 ## Running it from Xcode instead
 
