@@ -1,29 +1,30 @@
 import SwiftUI
 
-/// The portrait arrangement of the metering HUD, as Direction 1b's instrument
-/// face: two floating glass panels over the live scene, with the occasional
-/// controls between them.
+/// The portrait arrangement of the metering HUD, as the **settings-first**
+/// instrument face: the three values the photographer dials into their camera are
+/// the hero, and scene EV is a quiet reference.
 ///
-/// The **EV headline bar** at the top is the hero — scene brightness as the
-/// screen's largest value, with the freeze padlock and the settings gear rehoused
-/// at its two ends. The **dial panel** at the bottom is the instrument: the leg
-/// the photographer is turning, over a graduated rule under a fixed needle, with
-/// the advisory footer beneath it. Both float — inset from the screen edges and
-/// anchored to the safe area — so the photographer keeps a sense of the frame
-/// they are metering, the bar clears the Dynamic Island, and the panel clears the
-/// home indicator, none of it measured by hand.
+/// A photographer meters to answer "what do I set?" — ISO, shutter, aperture — not
+/// to read a scene-brightness number no camera has an input for. So the
+/// **exposure chips** are the headline: the full triangle as three large value
+/// chips, with the AUTO (solved) leg marked, doubling as the priority control
+/// (tap the AUTO leg to claim it). The **dial panel** below turns whichever leg
+/// the photographer tapped, over a graduated rule under a fixed needle, with the
+/// advisory footer beneath it. The **metering-pattern toggle** (average · spot)
+/// sits at the very bottom.
 ///
-/// The panel replaces the docked HUD drawer, which took the solved-leg hero (the
-/// bar has read it since #96) and the exposure chips with it. Below the panel, the
-/// **mode row** carries the two mode decisions — priority (which leg you hold) and
-/// metering pattern — as two independent segmented pairs (#99). It is what retires
-/// the metering-pattern pill, and with it the whole portrait status-pill layer:
-/// portrait no longer floats any pills, so this variant's only route to those
-/// controls is the row.
+/// Above them all, the **EV reference strip** is demoted from the old headline
+/// bar: scene brightness as a small reference that still names its ISO-100
+/// standard (ADR-0001), with the freeze padlock and the settings gear rehoused at
+/// its two ends. Every element floats — inset from the screen edges and anchored
+/// to the safe area — so the strip clears the Dynamic Island and the toggle clears
+/// the home indicator, none of it measured by hand.
 ///
-/// Landscape keeps its own arrangement entirely — the drawer, its chips, the
-/// padlock inside it, the status pills floating in the corner, and the gear — and
-/// inherits only the restyled dial.
+/// This reverses Direction 1b's EV-hero premise (#110); the chips, the padlock,
+/// and the dial are the same tested components, re-cast so the loudest thing on
+/// screen is the answer the photographer acts on. Landscape keeps its own
+/// arrangement entirely — the drawer, its chips, the padlock inside it, the status
+/// pills, and the gear — and inherits only the restyled dial.
 struct PortraitMeterLayout: View {
     let model: MeterViewModel
     /// The advisories snapshot to display — frozen while the tour runs.
@@ -42,11 +43,24 @@ struct PortraitMeterLayout: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            EVHeadlineBar(model: model)
+            // Demoted EV: a quiet reference strip carrying the padlock and gear at
+            // its ends, where the old headline bar was the hero.
+            EVReferenceStrip(model: model)
                 .padding(.horizontal, Self.panelInset)
                 .padding(.top, 8)
 
             Spacer()
+
+            // The hero: the exposure triangle as three large value chips. Tapping a
+            // live leg aims the dial at it; tapping the AUTO leg claims priority —
+            // the chips are the leg selector, so portrait needs no mode row.
+            ExposureChipsView(
+                triangle: model.triangle,
+                boundComponent: model.boundComponent,
+                emphasis: .hero,
+                onSelect: model.selectChip
+            )
+            .padding(.horizontal, Self.panelInset)
 
             MeterDialPanel(
                 model: model,
@@ -54,17 +68,15 @@ struct PortraitMeterLayout: View {
                 isTourActive: isTourActive
             )
             .padding(.horizontal, Self.panelInset)
+            .padding(.top, 8)
 
-            // The two mode decisions — priority and metering pattern — as one quiet
-            // row of small caps below the panel. It owns both mode controls now, so
-            // portrait floats no status pills at all; the pattern pill and the whole
-            // top-left pill layer are retired with it.
-            MeterModeRow(model: model)
+            // Metering pattern — the one mode decision the chips don't own — as a
+            // quiet toggle below the panel, the layout's bottom-most element. It
+            // takes the same inset off the bottom safe area, floating clear of the
+            // home indicator rather than bleeding behind it.
+            MeteringPatternToggle(pattern: model.pattern, onSelect: model.setPattern)
                 .padding(.horizontal, Self.panelInset)
                 .padding(.top, 8)
-                // The row is the layout's bottom-most element, so it takes the same
-                // inset off the bottom safe area the panel used to, floating clear
-                // of the home indicator rather than bleeding behind it.
                 .padding(.bottom, Self.panelInset)
         }
     }

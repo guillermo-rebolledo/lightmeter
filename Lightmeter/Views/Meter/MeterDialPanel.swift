@@ -47,6 +47,12 @@ struct MeterDialPanel: View {
     /// The gap between the headline, the rule, and the footer.
     private static let rowSpacing: CGFloat = 10
 
+    /// The point size of the panel's turning numeral — the leg the photographer is
+    /// adjusting. Named (and `internal`) so the settings-first chip hero can be
+    /// pinned above it by a test: the triangle the photographer dials in must read
+    /// larger than the single leg under the needle.
+    static let turningNumeralPointSize: CGFloat = 26
+
     var body: some View {
         VStack(spacing: Self.rowSpacing) {
             headline
@@ -95,11 +101,12 @@ struct MeterDialPanel: View {
                 .scaledToFitOnOneLine(minimumScale: 0.7)
 
             Text(model.dialValue ?? ExposureTriangle.pendingMarking)
-                // The screen's second-largest value, under the bar's 30pt hero.
-                // Fixed, because 26pt already outruns any Dynamic Type size —
-                // what a large numeral needs from an accessibility size is to
-                // keep fitting.
-                .font(AppTypography.numeral(fixedSize: 26))
+                // The leg the photographer is turning — the screen's second-largest
+                // value, under the settings-first chip hero (see
+                // ``ExposureChipsView/Emphasis/heroValuePointSize``). Fixed, because
+                // this size already outruns any Dynamic Type size — what a large
+                // numeral needs from an accessibility size is to keep fitting.
+                .font(AppTypography.numeral(fixedSize: Self.turningNumeralPointSize))
                 .foregroundStyle(.white)
                 // It counts rather than cutting as the rule sweeps under the
                 // thumb — the numeric transition needs an ambient animation to
