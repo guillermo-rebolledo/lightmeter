@@ -1,24 +1,28 @@
 import SwiftUI
 
 /// The portrait arrangement of the metering HUD, as Direction 1b's instrument
-/// face: the **EV headline bar** floating at the top of the screen, the status
-/// pills under it, and today's HUD drawer still docked to the bottom edge.
+/// face: two floating glass panels over the live scene, with the occasional
+/// controls between them.
 ///
-/// The bar is the new hero — scene brightness as the screen's largest value, with
-/// the freeze padlock and the settings gear rehoused at its two ends. It floats:
-/// inset from the screen edges and anchored to the safe area, so the photographer
-/// keeps a sense of the frame they are metering and the bar clears the Dynamic
-/// Island without measuring it.
+/// The **EV headline bar** at the top is the hero — scene brightness as the
+/// screen's largest value, with the freeze padlock and the settings gear rehoused
+/// at its two ends. The **dial panel** at the bottom is the instrument: the leg
+/// the photographer is turning, over a graduated rule under a fixed needle, with
+/// the advisory footer beneath it. Both float — inset from the screen edges and
+/// anchored to the safe area — so the photographer keeps a sense of the frame
+/// they are metering, the bar clears the Dynamic Island, and the panel clears the
+/// home indicator, none of it measured by hand.
 ///
-/// The drawer below is **unchanged** — the same shared `MeterHUDCard` content
-/// landscape docks, minus the padlock that moved into the bar, full-width and
-/// flush to the bottom edge with only its top two corners rounded. That makes
-/// this an intermediate state (the solved leg is read in two places at once) but
-/// a working one: everything the meter could do before this ticket, it still
-/// does. The drawer is replaced by the dial panel in a later ticket.
+/// The panel replaces the docked HUD drawer, which took the solved-leg hero (the
+/// bar has read it since #96) and the exposure chips with it. That leaves an
+/// **intermediate state**: priority mode was changed by tapping the AUTO chip,
+/// and the row that carried it is gone until #99 lands the segmented row that
+/// owns both mode decisions. Metering pattern and compensation still float as
+/// status pills until the same two tickets rehouse them.
 ///
-/// Landscape keeps its own arrangement entirely — no bar, the padlock still in
-/// the drawer, the gear still floating in the corner.
+/// Landscape keeps its own arrangement entirely — the drawer, its chips, the
+/// padlock inside it, and the gear floating in the corner — and inherits only the
+/// restyled dial.
 struct PortraitMeterLayout: View {
     let model: MeterViewModel
     /// The advisories snapshot to display — frozen while the tour runs.
@@ -49,17 +53,16 @@ struct PortraitMeterLayout: View {
 
             Spacer()
 
-            MeterHUDCard(
+            MeterDialPanel(
                 model: model,
                 advisories: advisories,
-                isTourActive: isTourActive,
-                // The padlock lives at the leading end of the bar now.
-                includesFreezeButton: false
+                isTourActive: isTourActive
             )
-            // Full-width drawer flush to the bottom safe area; the two-corner
-            // surface (glass, or material + scrim on the fallback) bleeds
-            // down behind the home indicator, the content stays clear of it.
-            .docked(edge: .bottom)
+            .padding(.horizontal, Self.panelInset)
+            // Held off the bottom safe area by the same inset it is held off the
+            // sides by, so it floats clear of the home indicator rather than
+            // bleeding behind it the way the drawer did.
+            .padding(.bottom, Self.panelInset)
         }
     }
 }

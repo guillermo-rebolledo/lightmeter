@@ -69,9 +69,13 @@ clever:
 
 Today's meter screen under the harness — the baseline any variant is compared
 against. Regenerate them with the sequence below whenever the meter screen
-changes deliberately. Last regenerated for the EV headline bar (#96): portrait
-now carries a floating glass bar at the top reading scene brightness, with the
-freeze padlock and the settings gear rehoused at its two ends.
+changes deliberately. Last regenerated for the instrument dial panel (#97):
+portrait now carries a floating glass dial panel at the bottom in place of the
+docked drawer — the leg being turned named over a graduated ruler under a fixed
+needle, with an advisory footer beneath. Full stops are numbered, the half- and
+third-stop clicks between them are bare ticks. (The exposure chips and the
+solved-leg hero left with the drawer; the segmented row that restores priority
+switching lands in #99.)
 
 | `blown-sky` | `dim-interior` | `mixed-contrast` |
 | --- | --- | --- |
@@ -81,9 +85,9 @@ freeze padlock and the settings gear rehoused at its two ends.
 
 | Scene | Nominal EV | What it is for |
 | --- | --- | --- |
-| `blown-sky` | 15 | Sunny-16 daylight. Most of the HUD sits over the brightest part of the frame; a near-black treeline cuts across the drawer. |
+| `blown-sky` | 15 | Sunny-16 daylight. Most of the HUD sits over the brightest part of the frame; a near-black treeline cuts across the dial panel. |
 | `dim-interior` | 6 | A lamp-lit room. Almost all shadow — where a dark scrim risks vanishing into the scene behind it. Also the state that raises the tripod advisory. |
-| `mixed-contrast` | 12 | A dark room with a blown window, placed so the drawer's surface carries near-white and near-black at once. |
+| `mixed-contrast` | 12 | A dark room with a blown window, placed so the dial panel's surface carries near-white and near-black at once. |
 
 The scenes are **drawn**, not photographed: a drawn scene renders identically on
 every run (which is what makes two screenshots comparable), reviews in a diff,
@@ -159,7 +163,7 @@ are named so a review can ask for one by name.
 | Name | What it shows | Arguments (after `-design-harness`) |
 | --- | --- | --- |
 | `default` | The ordinary screen: aperture-priority, average, live. The baseline. | *(none)* |
-| `pending` | Metering, before the first reading: the headline reads `EV —`, and the hero and the solved chip sit on the same em-dash placeholder. | `-harness-pending` |
+| `pending` | Metering, before the first reading: the bar's headline reads `EV —`, the solved leg beside it is an em-dash, and the dial panel names its bound leg over that leg's live value (it is a photographer input, not solved, so it is set even before the scene is read). | `-harness-pending` |
 | `frozen` | A held reading — the padlock closed. | `-harness-frozen` |
 | `spot` | Spot metering with the circular reticle at the frame center. EV is read off the headline bar — the reticle carries no reading of its own. | `-harness-pattern spot` |
 | `shutter-priority` | The shutter locked and the aperture solved — the mirror of the default. | `-harness-priority shutter` |
