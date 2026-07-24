@@ -17,12 +17,21 @@ struct AdvisoriesView: View {
         }
     }
 
+    /// What VoiceOver reads for a set of advisories.
+    ///
+    /// Pure and named, in the shape the readouts use, so "the warnings are
+    /// announced" is a fact a test can pin rather than something that has to be
+    /// read back off the accessibility tree. Spoken with commas rather than the
+    /// interpuncts the line is drawn with: a middle dot is not a pause.
+    static func accessibilityLabel(for advisories: [ExposureAdvisory]) -> String {
+        "Exposure warnings: " + advisories.map(\.message).joined(separator: ", ")
+    }
+
     /// The single thin line: the highest-priority advisory leads with its icon,
     /// and any remaining warnings are joined inline so the HUD stays one card.
     private func compactLine(primary: ExposureAdvisory) -> some View {
-        let messages = advisories.map(\.message)
-        return Label {
-            Text(messages.joined(separator: " · "))
+        Label {
+            Text(advisories.map(\.message).joined(separator: " · "))
                 .lineLimit(1)
         } icon: {
             Image(systemName: primary.systemImage)
@@ -34,7 +43,7 @@ struct AdvisoriesView: View {
         .foregroundStyle(Color.appAccent)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Exposure warnings: " + messages.joined(separator: ", "))
+        .accessibilityLabel(Self.accessibilityLabel(for: advisories))
     }
 
     /// Each advisory on its own full line, for layouts with vertical room.
@@ -51,7 +60,10 @@ struct AdvisoriesView: View {
     }
 }
 
-private extension ExposureAdvisory {
+extension ExposureAdvisory {
+    /// What the advisory says, drawn and spoken. Internal rather than private so
+    /// the footer's wording is testable — an unworded warning is a warning that
+    /// does not reach a VoiceOver user at all.
     var message: String {
         switch self {
         case .handheldRisk:
@@ -63,6 +75,7 @@ private extension ExposureAdvisory {
         }
     }
 
+    /// The glyph that leads the line.
     var systemImage: String {
         switch self {
         case .handheldRisk:

@@ -1,38 +1,31 @@
 import SwiftUI
 
-/// The metering HUD's content column, shared by both orientations: the freeze
-/// padlock beside the solved-leg hero, a thin advisory line, the exposure-triangle
-/// chips, and — folded in below them in *both* orientations now — the horizontal
-/// ruler dial.
+/// **Landscape's** metering HUD content column: the freeze padlock beside the
+/// solved-leg hero, a thin advisory line, the exposure-triangle chips, and the
+/// graduated ruler folded in below them.
 ///
 /// The occasional controls (metering pattern, compensation) are *not* here: they
-/// live over the preview as `MeterStatusPills` in the top-left, which is what
-/// clears the card down to the readout, the chips, and the dial.
+/// float over the preview as `MeterStatusPills`, which is what clears the card
+/// down to the readout, the chips, and the dial.
 ///
-/// Composing the *same* column in portrait and landscape is what keeps the two
-/// orientations at parity and lets tour anchors survive rotation: every anchor the
-/// card owns (`.evReadout`, `.priorityAndChips`, and the dial's `.dial`) lives on
-/// a shared control here, so rotating reflows the column without tearing down the
-/// camera or re-wiring the guided tour.
+/// It was shared by both orientations until #97, where portrait's instrument face
+/// replaced the docked drawer with the floating dial panel. Landscape's
+/// arrangement is unchanged — 1b's composition is vertical and does not fit a
+/// compact height, and there is no landscape mock — so it keeps this column, and
+/// inherits the shared improvements the controls inside it carry (the accent, and
+/// the restyled dial via `MeterDialHost`).
 ///
 /// This view is only the padded content. The docking chrome — the two-corner
 /// `GlassCardBackground` surface that bleeds to the screen edge, the stretch frame,
-/// and the `glassGroup()` wrapper — is applied by each layout via the shared
-/// `docked(edge:)` helper, which the surface stretches differently per edge
-/// (content-height at the bottom, full-height at the trailing edge).
+/// and the `glassGroup()` wrapper — is applied by the layout via the shared
+/// `docked(edge:)` helper, which still knows both edges: the bottom drawer is what
+/// this branch's portrait variant is being compared against, and it is where
+/// portrait goes back to if the variant loses.
 struct MeterHUDCard: View {
     let model: MeterViewModel
     /// The advisories snapshot to display — frozen while the tour runs.
     let advisories: [ExposureAdvisory]
     let isTourActive: Bool
-
-    /// Whether the card carries the freeze padlock beside its hero.
-    ///
-    /// `false` in portrait since #96, where the padlock was rehoused into the EV
-    /// headline bar — the mock has no home for it, and one padlock on the screen
-    /// is the point of it. Landscape has no bar, so it keeps the padlock here and
-    /// is otherwise untouched.
-    var includesFreezeButton = true
 
     var body: some View {
         VStack(spacing: 12) {
@@ -45,13 +38,11 @@ struct MeterHUDCard: View {
             SolvedLegReadoutView(triangle: model.triangle)
                 .frame(maxWidth: .infinity)
                 .overlay(alignment: .trailing) {
-                    if includesFreezeButton {
-                        FreezeButton(
-                            isFrozen: model.isFrozen,
-                            canFreeze: model.canFreeze,
-                            onToggle: model.toggleFreeze
-                        )
-                    }
+                    FreezeButton(
+                        isFrozen: model.isFrozen,
+                        canFreeze: model.canFreeze,
+                        onToggle: model.toggleFreeze
+                    )
                 }
                 .id(GuidedTourStep.evReadout)
             MeterAdvisories(advisories: advisories, isTourActive: isTourActive, isCompact: true)

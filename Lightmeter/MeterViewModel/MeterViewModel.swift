@@ -398,6 +398,22 @@ final class MeterViewModel {
         }
     }
 
+    /// Which of ``dialLabels`` are numbered on the rule, and which are bare ticks.
+    ///
+    /// Derived per target, like the labels beside it: an exposure leg's
+    /// graduations are its full stops, compensation's are its whole EVs. Read-only
+    /// and computed from state the model already publishes — the dial's binding
+    /// and the chosen increment — so it adds a view input rather than any
+    /// behaviour.
+    var dialGraduations: DialGraduations {
+        switch dialTarget {
+        case let .component(component):
+            DialGraduations(component: component, increment: preferences.increment)
+        case .compensation:
+            DialGraduations(compensationStops: Self.compensationStops)
+        }
+    }
+
     /// The current detent index for whichever control owns the shared dial.
     var dialStopIndex: Int? {
         switch dialTarget {
@@ -409,6 +425,16 @@ final class MeterViewModel {
                     < abs(Self.compensationStops[$1] - compensation)
             }
         }
+    }
+
+    /// The marking under the dial's needle — the panel's large numeral, and what
+    /// VoiceOver reads as the dial's value. `nil` only if the dial's index and its
+    /// labels ever disagree, which the panel shows as the pending placeholder
+    /// rather than as a blank where the screen's second-largest value should be.
+    var dialValue: String? {
+        guard let index = dialStopIndex else { return nil }
+        let labels = dialLabels
+        return labels.indices.contains(index) ? labels[index] : nil
     }
 
     /// The VoiceOver caption for the active shared-dial target.

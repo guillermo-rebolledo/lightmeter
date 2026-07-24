@@ -1,30 +1,38 @@
 import SwiftUI
 import UIKit
 
-/// A compact horizontal linear ruler dial: the scale's stops lie along a straight
-/// ruler and sweep past a fixed indicator as you drag. Each stop that crosses the
-/// indicator fires a selection haptic — the detent tick that makes the dial feel
-/// mechanical. Snapping is stop-to-stop; the ruler always settles on a real,
-/// dial-able mark.
+/// A graduated horizontal ruler: the scale's stops lie along a straight rule and
+/// sweep past a fixed needle as you drag. Each stop that crosses the needle fires
+/// a selection haptic — the detent tick that makes the dial feel mechanical.
+/// Snapping is stop-to-stop; the ruler always settles on a real, dial-able mark.
 ///
-/// The dial hugs the bottom of the HUD content and sweeps left/right; it is folded
-/// under the chips in both orientations. (An earlier axis-generic variant also ran
-/// vertically along the landscape trailing edge; that slot is gone, so the view is
-/// horizontal-only.)
+/// **Major and minor graduations.** Full stops carry a long tick and a number;
+/// the half- and third-stop clicks between them are bare ticks, the way a lens
+/// barrel is marked. Which is which is not this view's decision — it asks
+/// ``DialGraduations``, which derives it from membership in the full-stop scale.
+/// At the full-stop increment every graduation is major, so the ruler reads
+/// exactly like a barrel; at thirds it stays a rule with numbers on it rather
+/// than a wall of digits.
+///
+/// **The needle is fixed and the scale moves.** It sits above the graduations,
+/// pointing down at the mark it is naming, and never moves — so the photographer's
+/// eye has one place to look while the values run under it.
 ///
 /// The dial is a pure controller: `selectedIndex` and `labels` are the source of
 /// truth (owned by `MeterViewModel`), and `onSelect` reports each new detent up.
 /// A drag is expressed in continuous stop-units and rounded to the nearest stop,
 /// so the same gesture drives both the visual sweep and the reported value. All
 /// tick-placement and drag→stop math lives in `LinearDialGeometry`.
+///
+/// It does **not** show the selected value: the dial panel says what is being
+/// turned and shows it as its large numeral, directly above. Landscape's drawer
+/// composes the same restyled ruler under chips that carry the same values.
 struct LinearDialView: View {
-    /// The height the dial requires, including ticks, the centred label, and
-    /// gesture area — far slimmer than the old arc, reclaiming frame for the preview.
-    static let layoutThickness: CGFloat = 64
-
     /// The detent labels laid out along the ruler.
     let labels: [String]
-    /// The stop the fixed indicator currently points at, or `nil` while unbound.
+    /// Which of those labels are numbered on the rule.
+    let graduations: DialGraduations
+    /// The stop the fixed needle currently points at, or `nil` while unbound.
     let selectedIndex: Int?
     /// The leg being dialed, e.g. `"Aperture"` — announced to VoiceOver when bound.
     let caption: String?
@@ -47,23 +55,36 @@ struct LinearDialView: View {
     /// which SwiftUI's edge-triggered `.sensoryFeedback` can't express.
     @State private var haptics = UISelectionFeedbackGenerator()
 
-    /// The tick-placement and drag→stop math, shared with the unit tests. Its
-    /// single `spacing` makes the ruler track the finger 1:1 — the mark under your
-    /// thumb stays under it as you sweep (direct manipulation), which a straight
-    /// ruler should honour even though the old arc did not.
-    private let geometry = LinearDialGeometry(spacing: 48)
+    /// The gap between adjacent graduations, and — because it is one value — the
+    /// drag travel that advances the dial one stop. That is what makes the rule
+    /// track the finger 1:1: the mark under your thumb stays under it as you sweep.
+    ///
+    /// Scaled with Dynamic Type, because the numbers under the ticks are. Holding
+    /// the spacing while the numbers grew would run "1/8000" into "1/4000" at the
+    /// larger text sizes — an unreadable rule, which is the failure the major /
+    /// minor split exists to avoid in the first place.
+    @ScaledMetric(relativeTo: .caption2) private var stopSpacing: CGFloat = 48
+
+    /// The tick-placement and drag→stop math, shared with the unit tests.
+    private var geometry: LinearDialGeometry { LinearDialGeometry(spacing: stopSpacing) }
+
     /// How many stops fan out either side of centre before they clip/fade.
     private let visibleSpan = 7
-    /// Distance from the hugged edge to the centred selected label (nearest edge).
-    private let labelInset: CGFloat = 14
-    /// Distance from the hugged edge to the fixed indicator caret.
-    private let indicatorInset: CGFloat = 34
-    /// Distance from the hugged edge to the row of ticks (furthest in).
-    private let tickInset: CGFloat = 50
+    /// A numbered graduation's tick, long enough to read as the mark its number
+    /// belongs to; the clicks between them are half of it.
+    private let majorTickHeight: CGFloat = 15
+    private let minorTickHeight: CGFloat = 7
+    /// The gap between the needle and the rule, and between the rule and its
+    /// numbers — the second smaller, so a number reads as belonging to the tick
+    /// above it rather than floating between two rows.
+    private let needleGap: CGFloat = 5
+    private let numberGap: CGFloat = 3
 
     /// The effective dial position: the live drag while dragging, else the
     /// committed selection.
     private var position: CGFloat { dragPosition ?? CGFloat(selectedIndex ?? 0) }
+    /// The stop under the needle right now.
+    private var markedIndex: Int { geometry.stop(at: position) }
     /// Whether the dial has a complete target and should reveal its visual content.
     private var isBound: Bool {
         guard let selectedIndex, caption != nil else { return false }
@@ -71,29 +92,13 @@ struct LinearDialView: View {
     }
 
     var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                ForEach(visibleIndices, id: \.self) { index in
-                    let offset = geometry.tickOffset(for: index, position: position)
-                    tickMark(index)
-                        .position(tickPosition(offset: offset, in: geo.size))
-                }
-            }
-            .frame(width: geo.size.width, height: geo.size.height)
-            .mask(edgeFade)
-            .transaction { $0.animation = nil }
-            .opacity(isBound ? 1 : 0)
-            .animation(.easeOut(duration: 0.15), value: isBound)
-
-            selectedLabel
-                .opacity(isBound ? 1 : 0)
-                .position(labelPosition(in: geo.size))
-
-            indicator
-                .opacity(isBound ? 1 : 0)
-                .position(indicatorPosition(in: geo.size))
+        VStack(spacing: needleGap) {
+            needle
+            rule
         }
-        .frame(height: Self.layoutThickness)
+        .frame(maxWidth: .infinity)
+        .opacity(isBound ? 1 : 0)
+        .animation(.easeOut(duration: 0.15), value: isBound)
         .contentShape(Rectangle())
         .gesture(dialGesture)
         .accessibilityElement()
@@ -110,81 +115,94 @@ struct LinearDialView: View {
         }
     }
 
-    // MARK: - Geometry
+    // MARK: - The rule
 
-    /// The horizontal centre of the ruler: the width's midpoint. Ticks are placed
-    /// relative to it.
-    private func mainAxisCenter(in size: CGSize) -> CGFloat {
-        size.width / 2
+    /// The graduations and their numbers — the part that moves. Masked at both
+    /// ends so marks fade out rather than clipping at a hard edge as they sweep.
+    private var rule: some View {
+        VStack(spacing: numberGap) {
+            marks(minHeight: majorTickHeight) { tickMark($0) }
+            marks(minHeight: nil) { number($0) }
+        }
+        .mask(edgeFade)
+        // The sweep follows the finger exactly, so it is never animated: the one
+        // animation the rule has is the spring that settles `dragPosition`.
+        .transaction { $0.animation = nil }
     }
 
-    /// Where a tick sits, given its signed `offset` from the fixed indicator along
-    /// the ruler. The vertical position is fixed at `tickInset` from the bottom edge.
-    private func tickPosition(offset: CGFloat, in size: CGSize) -> CGPoint {
-        CGPoint(x: mainAxisCenter(in: size) + offset, y: tickInset)
+    /// One row of the rule: every visible graduation, offset from the centre by
+    /// its distance from the needle.
+    ///
+    /// `ZStack` centres its children, so an offset from centre is an offset from
+    /// the needle — no `GeometryReader`, and the row keeps the height of its
+    /// content rather than a hard-coded thickness that Dynamic Type would outgrow.
+    private func marks(
+        minHeight: CGFloat?,
+        @ViewBuilder mark: @escaping (Int) -> some View
+    ) -> some View {
+        ZStack(alignment: .top) {
+            // Reserves the row's height whatever happens to be visible: a window
+            // of thirds can hold no numbered stop at all, and a numbers row that
+            // collapsed to nothing would take the rule's height down with it.
+            Text(" ")
+                .font(Self.numberFont)
+                .hidden()
+                .accessibilityHidden(true)
+
+            ForEach(visibleIndices, id: \.self) { index in
+                mark(index)
+                    .offset(x: geometry.tickOffset(for: index, position: position))
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .top)
     }
 
-    /// The centred selected value's anchor, near the bottom edge and lined up with
-    /// the fixed indicator.
-    private func labelPosition(in size: CGSize) -> CGPoint {
-        CGPoint(x: mainAxisCenter(in: size), y: labelInset)
-    }
-
-    /// The fixed indicator's anchor: between the label and the tick row, at the
-    /// ruler's centre, so its caret points down at the selected tick.
-    private func indicatorPosition(in size: CGSize) -> CGPoint {
-        CGPoint(x: mainAxisCenter(in: size), y: indicatorInset)
-    }
-
-    // MARK: - Marks
-
-    /// A single tick on the ruler — a short capsule, accented when selected and
-    /// faded by its distance from the indicator. Only ticks are drawn here; the
-    /// selected value is labelled once, separately, over the indicator.
+    /// A single graduation: long for a full stop, short for a click between them,
+    /// accented under the needle and faded by its distance from it.
     private func tickMark(_ index: Int) -> some View {
-        let isSelected = geometry.stop(at: position) == index
-        let distance = abs(CGFloat(index) - position)
+        let isMarked = index == markedIndex
 
         return Capsule()
             .frame(
-                width: isSelected ? 2 : 1,
-                height: isSelected ? 16 : 10
+                width: isMarked ? 2 : 1,
+                height: graduations.isMajor(index) ? majorTickHeight : minorTickHeight
             )
-            .foregroundStyle(isSelected
+            .foregroundStyle(isMarked
                 ? AnyShapeStyle(.tint)
-                : AnyShapeStyle(.white.opacity(fade(for: distance))))
-            .animation(reduceMotion ? nil : .snappy, value: isSelected)
+                : AnyShapeStyle(.white.opacity(fade(for: index))))
     }
 
-    /// The single labelled value: the selected stop, shown once over the indicator
-    /// so the ruler reads as ticks with one number rather than a wall of digits.
-    private var selectedLabel: some View {
-        Text(labels[safe: geometry.stop(at: position)] ?? "")
-            // Fixed, like the hero: the label sits over a ruler whose ticks do
-            // not move, so growing it with Dynamic Type would only walk it off
-            // the marks it is naming.
-            .font(AppTypography.numeral(fixedSize: 19))
-            // …and, unlike the hero, it does not scale to fit. It is one short
-            // value alone above the full width of the ruler — the longest of them
-            // ("1/8000") is a fraction of that even in the wider monospaced face —
-            // so there is nothing to shrink away from, and `fixedSize` is what
-            // keeps the positioned label from being squeezed by its container.
-            .fixedSize()
-            .foregroundStyle(.tint)
-            .animation(nil, value: position)
+    /// A numbered graduation's marking, under its tick. Minor graduations draw
+    /// nothing — that is the whole point of the split.
+    @ViewBuilder private func number(_ index: Int) -> some View {
+        if graduations.isMajor(index), let label = labels[safe: index] {
+            Text(label)
+                .font(Self.numberFont)
+                // One short marking per tick, with the gap to its neighbour to sit
+                // in — it never needs to wrap or shrink, and fixing it is what
+                // keeps the offset row from squeezing it to a column of letters.
+                .fixedSize()
+                .foregroundStyle(index == markedIndex
+                    ? AnyShapeStyle(.tint)
+                    : AnyShapeStyle(.white.opacity(fade(for: index))))
+        }
     }
 
-    /// The fixed indicator the values sweep past — a caret pinned over the tick row,
-    /// pointing at the selected mark.
-    private var indicator: some View {
+    /// The fixed needle the graduations sweep past: a caret above the rule,
+    /// pointing down at the mark it is naming.
+    private var needle: some View {
         Image(systemName: "arrowtriangle.down.fill")
             .font(.system(size: 11))
             .foregroundStyle(.tint)
             .accessibilityHidden(true)
     }
 
-    /// Softens the ends of the ruler so ticks fade out rather than clip at a hard
-    /// edge as they sweep left/right.
+    /// The numbers on the rule — the app's smallest tier, in the numeric face
+    /// every other value on the screen wears.
+    private static let numberFont = AppTypography.numeral(.caption2, weight: .medium)
+
+    /// Softens the ends of the rule so graduations fade out rather than clip at a
+    /// hard edge as they sweep left/right.
     private var edgeFade: some View {
         LinearGradient(
             stops: [
@@ -215,7 +233,7 @@ struct LinearDialView: View {
                 }
 
                 // Dragging back (left) advances toward higher values; one
-                // `pointsPerStop` of travel is one stop.
+                // `stopSpacing` of travel is one stop.
                 let travel = value.translation.width
                 let clamped = geometry.position(fromAnchor: dragAnchorIndex, travel: travel, stopCount: labels.count)
                 dragPosition = clamped
@@ -233,11 +251,18 @@ struct LinearDialView: View {
                 onSelect(rounded)
             }
             .onEnded { _ in
-                // Every crossing was already reported in `onChanged`; just settle
-                // the fractional overshoot onto the snapped stop.
-                withAnimation(reduceMotion ? nil : .snappy) { dragPosition = nil }
+                // Every crossing was already reported in `onChanged`; this settles
+                // the fractional overshoot onto the snapped stop — with a spring,
+                // because a rule that eased to a stop would read as a slider and
+                // one that snapped instantly would read as a picker. A flicked
+                // dial should arrive like something with mass.
+                withAnimation(reduceMotion ? nil : Self.settle) { dragPosition = nil }
             }
     }
+
+    /// How a flicked rule comes to rest. Just enough bounce to feel like mass,
+    /// short enough that the value under the needle is never in doubt.
+    private static let settle = Animation.spring(response: 0.32, dampingFraction: 0.72)
 
     // MARK: - Helpers
 
@@ -246,10 +271,10 @@ struct LinearDialView: View {
         geometry.visibleIndices(around: position, stopCount: labels.count, span: visibleSpan)
     }
 
-    /// Opacity for a tick `distance` stops from the indicator: full at centre,
-    /// trailing off toward the edges but never fully invisible.
-    private func fade(for distance: CGFloat) -> Double {
-        max(0.12, 1 - Double(distance) * 0.13)
+    /// Opacity for the graduation at `index`: full under the needle, trailing off
+    /// toward the ends of the rule but never fully invisible.
+    private func fade(for index: Int) -> Double {
+        max(0.12, 1 - Double(abs(CGFloat(index) - position)) * 0.13)
     }
 }
 
@@ -260,25 +285,39 @@ private extension Array {
     }
 }
 
-#Preview("Horizontal") {
-    struct DialPreview: View {
-        @State private var index = 18 // f/8 on the aperture scale
-        var body: some View {
-            ZStack {
-                Color.black.ignoresSafeArea()
-                VStack {
-                    Spacer()
-                    LinearDialView(
-                        labels: PhotographicScale.aperture.stops.map(\.label),
-                        selectedIndex: index,
-                        caption: "Aperture",
-                        onSelect: { index = $0 }
-                    )
-                }
+#Preview("Thirds") {
+    DialPreview(increment: .third)
+}
+
+#Preview("Full stops") {
+    DialPreview(increment: .full)
+}
+
+/// The rule over a dark scene at a chosen increment — the two ends of the
+/// major / minor split, side by side in the canvas.
+private struct DialPreview: View {
+    let increment: StopIncrement
+
+    @State private var index = 0
+
+    private var scale: PhotographicScale { .aperture(for: increment) }
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            VStack {
+                Spacer()
+                LinearDialView(
+                    labels: scale.stops.map(\.label),
+                    graduations: DialGraduations(component: .aperture, increment: increment),
+                    selectedIndex: index,
+                    caption: ExposureComponent.aperture.caption,
+                    onSelect: { index = $0 }
+                )
             }
-            .tint(.appAccent)
-            .preferredColorScheme(.dark)
         }
+        .tint(.appAccent)
+        .preferredColorScheme(.dark)
+        .onAppear { index = scale.stops.count / 2 }
     }
-    return DialPreview()
 }
