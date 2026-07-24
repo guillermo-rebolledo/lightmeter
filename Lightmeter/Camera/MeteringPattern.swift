@@ -26,6 +26,16 @@ enum MeteringPattern: CaseIterable, Equatable, Sendable {
         }
     }
 
+    /// What VoiceOver calls this pattern where it appears as a segment in the mode
+    /// row — named as a *metering pattern* so it is distinct from the priority
+    /// segments beside it, which would otherwise read as the same kind of choice.
+    var accessibilityLabel: String {
+        switch self {
+        case .average: return "Average metering"
+        case .spot: return "Spot metering"
+        }
+    }
+
     /// The SF Symbol that depicts this metering pattern.
     var systemImage: String {
         switch self {

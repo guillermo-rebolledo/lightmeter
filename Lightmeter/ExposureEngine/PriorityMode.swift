@@ -32,6 +32,18 @@ enum PriorityMode: CaseIterable, Equatable, Sendable {
         lockedComponent.caption
     }
 
+    /// What VoiceOver calls this mode where it appears as a segment in the mode
+    /// row — the full name, and named as a *priority* so it can't be mistaken for
+    /// the metering-pattern segments beside it. The compact small-caps glyph the
+    /// row draws (``label``) is not enough on its own to tell a mode segment from
+    /// a pattern one when both are read aloud.
+    var accessibilityLabel: String {
+        switch self {
+        case .aperturePriority: return "Aperture priority"
+        case .shutterPriority: return "Shutter priority"
+        }
+    }
+
     /// The other mode — what a single toggle switches to.
     var toggled: PriorityMode {
         switch self {

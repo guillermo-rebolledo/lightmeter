@@ -707,4 +707,56 @@ struct MeterViewModelTests {
         #expect(vm.triangle.shutter?.label == "1/30")
         #expect(abs(vm.triangle.aperture!.value / atFast - 2) < 0.02)
     }
+
+    // MARK: - Priority and metering pattern are independent
+
+    /// Priority and metering pattern are orthogonal — the whole reason the mode row
+    /// models them as two independent pairs rather than the mock's single
+    /// four-segment control. Changing the priority must leave the pattern (and its
+    /// placed spot) exactly where it was, in either direction.
+    @Test func changingPriorityLeavesTheMeteringPatternUntouched() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        vm.setPattern(.spot)
+        let placedSpot = vm.spot
+
+        vm.setMode(.shutterPriority)
+        #expect(vm.pattern == .spot)
+        #expect(vm.spot == placedSpot)
+
+        vm.setMode(.aperturePriority)
+        #expect(vm.pattern == .spot)
+        #expect(vm.spot == placedSpot)
+    }
+
+    /// The mirror: changing the metering pattern must not disturb the priority
+    /// mode. Selecting spot then average leaves shutter-priority intact.
+    @Test func changingTheMeteringPatternLeavesThePriorityUntouched() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        vm.setMode(.shutterPriority)
+
+        vm.setPattern(.spot)
+        #expect(vm.mode == .shutterPriority)
+
+        vm.setPattern(.average)
+        #expect(vm.mode == .shutterPriority)
+    }
+
+    /// Tapping a priority segment points the dial at that leg *even when the mode
+    /// is already active* — the route home after dialling ISO from the bar. The
+    /// mode row calls `setMode` for this, so re-selecting the current mode re-binds
+    /// the dial back to its priority leg rather than being a no-op.
+    @Test func tappingTheActivePrioritySegmentPointsTheDialHome() {
+        let vm = MeterViewModel(source: FakeLightSource())
+        #expect(vm.mode == .aperturePriority)
+        #expect(vm.boundComponent == .aperture)
+
+        // Dial away to ISO, the way the bar's ISO control does.
+        vm.selectChip(.iso)
+        #expect(vm.boundComponent == .iso)
+
+        // Re-tap the already-active priority segment: mode unchanged, dial home.
+        vm.setMode(.aperturePriority)
+        #expect(vm.mode == .aperturePriority)
+        #expect(vm.boundComponent == .aperture)
+    }
 }

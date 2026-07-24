@@ -14,22 +14,25 @@ import SwiftUI
 /// home indicator, none of it measured by hand.
 ///
 /// The panel replaces the docked HUD drawer, which took the solved-leg hero (the
-/// bar has read it since #96) and the exposure chips with it. That leaves an
-/// **intermediate state**: priority mode was changed by tapping the AUTO chip,
-/// and the row that carried it is gone until #99 lands the segmented row that
-/// owns both mode decisions. Metering pattern and compensation still float as
-/// status pills until the same two tickets rehouse them.
+/// bar has read it since #96) and the exposure chips with it. Below the panel, the
+/// **mode row** carries the two mode decisions — priority (which leg you hold) and
+/// metering pattern — as two independent segmented pairs (#99). It is what retires
+/// the metering-pattern pill, and with it the whole portrait status-pill layer:
+/// portrait no longer floats any pills, so this variant's only route to those
+/// controls is the row.
 ///
 /// Landscape keeps its own arrangement entirely — the drawer, its chips, the
-/// padlock inside it, and the gear floating in the corner — and inherits only the
-/// restyled dial.
+/// padlock inside it, the status pills floating in the corner, and the gear — and
+/// inherits only the restyled dial.
 struct PortraitMeterLayout: View {
     let model: MeterViewModel
     /// The advisories snapshot to display — frozen while the tour runs.
     let advisories: [ExposureAdvisory]
     let isTourActive: Bool
-    /// The guided tour's current step, or `nil` when the tour isn't running —
-    /// forwarded to the status pills, whose editors hold two of its anchors.
+    /// The guided tour's current step, or `nil` when the tour isn't running.
+    /// Unused by the portrait layout now that its controls are the bar, the panel,
+    /// and the mode row (none of which the disabled tour drives), but kept in the
+    /// shared shape both layouts are constructed with.
     var tourStep: GuidedTourStep?
 
     /// The panels' inset from the screen edges — the handoff's 12pt margin, and
@@ -43,17 +46,6 @@ struct PortraitMeterLayout: View {
                 .padding(.horizontal, Self.panelInset)
                 .padding(.top, 8)
 
-            // The occasional controls, still floating over the preview but now
-            // below the bar that took their corner. They keep their own surfaces:
-            // they are over the scene, not on the panel. Compensation is no longer
-            // among them — #98 gave it a permanent draggable track in the dial
-            // panel and retired its pill — so only the metering-pattern pill floats
-            // here until #99 rehouses it into the segmented row.
-            MeterStatusPills(model: model, tourStep: tourStep, controls: [.pattern])
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, Self.panelInset)
-                .padding(.top, 8)
-
             Spacer()
 
             MeterDialPanel(
@@ -62,10 +54,18 @@ struct PortraitMeterLayout: View {
                 isTourActive: isTourActive
             )
             .padding(.horizontal, Self.panelInset)
-            // Held off the bottom safe area by the same inset it is held off the
-            // sides by, so it floats clear of the home indicator rather than
-            // bleeding behind it the way the drawer did.
-            .padding(.bottom, Self.panelInset)
+
+            // The two mode decisions — priority and metering pattern — as one quiet
+            // row of small caps below the panel. It owns both mode controls now, so
+            // portrait floats no status pills at all; the pattern pill and the whole
+            // top-left pill layer are retired with it.
+            MeterModeRow(model: model)
+                .padding(.horizontal, Self.panelInset)
+                .padding(.top, 8)
+                // The row is the layout's bottom-most element, so it takes the same
+                // inset off the bottom safe area the panel used to, floating clear
+                // of the home indicator rather than bleeding behind it.
+                .padding(.bottom, Self.panelInset)
         }
     }
 }
