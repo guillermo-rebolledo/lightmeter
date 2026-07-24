@@ -177,17 +177,20 @@ enum LaunchDiagnostics {
         }
     }
 
-    /// Logs the first drag the ruler receives after launch and stops the watchdog —
-    /// the success signal the issue asks to confirm ("draggable within the first
-    /// frames"). Lined up against the stall log, it says whether the dial came
-    /// alive before or after the main thread was blocked.
+    /// Logs the first drag the ruler receives after launch — the success signal the
+    /// issue asks to confirm ("draggable within the first frames"). It deliberately
+    /// does **not** stop the watchdog: the first on-device capture showed the drag's
+    /// own updates starving for ~1s stretches that end exactly when
+    /// `session.startRunning()` returns, so the main thread must stay under watch
+    /// *through* the drag to tell a genuine main-thread block during camera warmup
+    /// from event delivery being starved some other way. The watchdog still winds
+    /// down on its own at `warmupWindow`.
     @MainActor static func noteFirstDialDrag() {
         guard isEnabled, !didNoteFirstDialDrag else { return }
         didNoteFirstDialDrag = true
         logger.notice(
             "\(milestoneLine(event: Milestone.firstDialDrag.rawValue, sinceLaunchMS: elapsedMilliseconds()), privacy: .public)"
         )
-        stopMonitor()
     }
 
     /// How many updates the first drag has delivered, and whether it has ended — so
@@ -223,8 +226,9 @@ enum LaunchDiagnostics {
     }
 
     /// How long the watchdog runs before giving up on its own — comfortably past
-    /// the first-couple-of-seconds window the swallowed touches fall in.
-    private static let warmupWindow: CFTimeInterval = 8
+    /// the warmup, which has run as long as ~4s on device, so the whole
+    /// `startRunning()` window (where the drag starves) stays under watch.
+    private static let warmupWindow: CFTimeInterval = 12
 
     @MainActor private static func stopMonitor() {
         monitor?.stop()
