@@ -176,7 +176,16 @@ struct ContentView: View {
             }
             .toolbarBackground(.hidden, for: .navigationBar)
             .tint(.appAccent)
-            .task { await model.start() }
+            .task {
+                await model.start()
+                #if DEBUG
+                // Drives the meter to the state this launch named, or does
+                // nothing on an ordinary run. After `start()`, because the
+                // harness sets state the same way a photographer would — on a
+                // running meter, through the same entry points.
+                await DesignHarness.applyLaunchState(to: model)
+                #endif
+            }
             .onDisappear { model.stop() }
         }
         .onChange(of: model.status, initial: true) {

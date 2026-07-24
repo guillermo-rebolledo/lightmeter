@@ -27,7 +27,17 @@ struct DesignHarnessConfiguration: Equatable {
 
     /// The scene's EV@ISO 100 — what the meter reads. Defaults to the chosen
     /// scene's own light, so naming a scene is enough to see the HUD under it.
+    /// An advisory preset overrides it: a warning cannot be promised without
+    /// pinning the light that raises it.
     var sceneEV: Double
+
+    /// Whether the meter is held before its first reading — the state the screen
+    /// is in for a fraction of a second on a phone, and otherwise impossible to
+    /// screenshot on purpose. Metering starts as usual; nothing ever arrives.
+    var isPending: Bool
+
+    /// What the screen is showing: mode, pattern, bias, freeze.
+    var state: DesignHarnessMeterState
 
     /// The flag that turns the harness on. Nothing else here has any effect
     /// without it, so a stray `-harness-ev` in a scheme can't quietly fake the
@@ -35,6 +45,12 @@ struct DesignHarnessConfiguration: Equatable {
     private static let enableFlag = "-design-harness"
     private static let sceneOption = "-harness-scene"
     private static let sceneEVOption = "-harness-ev"
+    private static let priorityOption = "-harness-priority"
+    private static let patternOption = "-harness-pattern"
+    private static let compensationOption = "-harness-compensation"
+    private static let advisoryOption = "-harness-advisory"
+    private static let frozenFlag = "-harness-frozen"
+    private static let pendingFlag = "-harness-pending"
 
     /// Reads the harness' configuration out of a process' launch arguments, or
     /// `nil` when the harness was not asked for.
@@ -46,10 +62,40 @@ struct DesignHarnessConfiguration: Equatable {
 
         let scene = value(of: sceneOption, in: launchArguments)
             .flatMap(StandInScene.init(rawValue:)) ?? .blownSky
-        let sceneEV = value(of: sceneEVOption, in: launchArguments)
-            .flatMap(Double.init) ?? scene.nominalEV
+        let requestedMode = value(of: priorityOption, in: launchArguments)
+            .flatMap(PriorityMode.init(harnessArgument:)) ?? DesignHarnessMeterState.opening.mode
+        let advisory = value(of: advisoryOption, in: launchArguments)
+            .flatMap(DesignHarnessAdvisoryPreset.init(rawValue:)) ?? .auto
+        // The preset has the last word on the light and the legs: it is a promise
+        // about what is on screen, and it cannot keep that promise while another
+        // argument moves the solve out from under it.
+        let recipe = advisory.recipe(requestedMode: requestedMode)
 
-        return DesignHarnessConfiguration(scene: scene, sceneEV: sceneEV)
+        let sceneEV = recipe?.sceneEV
+            ?? value(of: sceneEVOption, in: launchArguments).flatMap(Double.init)
+            ?? scene.nominalEV
+        let isPending = launchArguments.contains(pendingFlag)
+
+        let state = DesignHarnessMeterState(
+            mode: recipe?.mode ?? requestedMode,
+            pattern: value(of: patternOption, in: launchArguments)
+                .flatMap(MeteringPattern.init(harnessArgument:))
+                ?? DesignHarnessMeterState.opening.pattern,
+            compensation: value(of: compensationOption, in: launchArguments)
+                .flatMap(Double.init) ?? DesignHarnessMeterState.opening.compensation,
+            // A pending meter has no reading to hold, so the two are not
+            // combinable; resolving it here keeps the launch from waiting on a
+            // reading that is never coming.
+            isFrozen: launchArguments.contains(frozenFlag) && isPending == false,
+            legs: recipe?.legs
+        )
+
+        return DesignHarnessConfiguration(
+            scene: scene,
+            sceneEV: sceneEV,
+            isPending: isPending,
+            state: state
+        )
     }
 
     /// The argument following `option`, or `nil` when the option is absent or is
@@ -59,6 +105,34 @@ struct DesignHarnessConfiguration: Equatable {
         let valueIndex = arguments.index(after: index)
         guard valueIndex < arguments.endIndex else { return nil }
         return arguments[valueIndex]
+    }
+}
+
+// MARK: - Launch-argument spellings
+//
+// Kept here rather than on the production enums: the harness is the only thing
+// that needs a string form of these, and a Release build has no business
+// carrying one.
+
+extension PriorityMode {
+    /// The mode named on the command line, by the leg it holds fixed.
+    init?(harnessArgument: String) {
+        switch harnessArgument {
+        case "aperture": self = .aperturePriority
+        case "shutter": self = .shutterPriority
+        default: return nil
+        }
+    }
+}
+
+extension MeteringPattern {
+    /// The pattern named on the command line.
+    init?(harnessArgument: String) {
+        switch harnessArgument {
+        case "average": self = .average
+        case "spot": self = .spot
+        default: return nil
+        }
     }
 }
 
@@ -76,7 +150,31 @@ enum DesignHarness {
     /// The light source the meter should be driven by, or `nil` to use the real
     /// camera. Each call vends a fresh source; the app makes exactly one.
     static func makeLightSource() -> LightSource? {
-        configuration.map { ScriptedLightSource(sceneEV: $0.sceneEV) }
+        configuration.map(makeLightSource(for:))
+    }
+
+    /// The source a given configuration asks for. Split out from the launch-time
+    /// entry point above so a test can drive a configuration it built itself,
+    /// rather than the one this process happened to launch with.
+    static func makeLightSource(for configuration: DesignHarnessConfiguration) -> LightSource {
+        ScriptedLightSource(
+            sceneEV: configuration.sceneEV,
+            // A pending launch meters exactly as usual and simply never receives
+            // anything — which is what the state *is*, rather than a fourth
+            // status invented to stand for it.
+            emitsReadings: configuration.isPending == false
+        )
+    }
+
+    /// Drives a freshly-started meter to the state this launch asked for, or does
+    /// nothing at all on an ordinary run.
+    ///
+    /// Called once, right after `MeterViewModel.start()`. Everything it does goes
+    /// through the view-model's own entry points, so the harness cannot reach a
+    /// state the UI could not.
+    @MainActor
+    static func applyLaunchState(to model: MeterViewModel) async {
+        await configuration?.state.apply(to: model)
     }
 
     /// The scene to draw where there is no capture device.

@@ -24,6 +24,13 @@ final class ScriptedLightSource: LightSource {
     /// The scene's EV@ISO 100 — what the meter will read.
     let sceneEV: Double
 
+    /// Whether readings are actually published. A source that authorizes, starts,
+    /// and then stays silent is how the harness reaches the state *before the
+    /// first reading* — the meter is genuinely metering and genuinely has nothing
+    /// yet, exactly as it is for the first moment on a phone. The stream stays
+    /// open, because a stream that ended would mean capture had failed.
+    let emitsReadings: Bool
+
     /// How often a reading is republished. Slow enough to cost nothing, frequent
     /// enough that the screen is genuinely live under the harness.
     private static let emitInterval = Duration.milliseconds(250)
@@ -39,8 +46,9 @@ final class ScriptedLightSource: LightSource {
     private var activeContinuation: AsyncStream<LightReading>.Continuation?
     private var routedExposurePoint: CGPoint?
 
-    init(sceneEV: Double) {
+    init(sceneEV: Double, emitsReadings: Bool = true) {
         self.sceneEV = sceneEV
+        self.emitsReadings = emitsReadings
     }
 
     deinit {
@@ -83,6 +91,7 @@ final class ScriptedLightSource: LightSource {
             bufferingPolicy: .bufferingNewest(1)
         )
         let reading = self.reading
+        let emitsReadings = self.emitsReadings
 
         // Detached so the emit loop doesn't inherit the caller's actor: the
         // camera samples on its own queues, and the stand-in should not quietly
@@ -92,7 +101,10 @@ final class ScriptedLightSource: LightSource {
         let task = Task.detached {
             // Yield the first reading immediately so the meter is live on the
             // first frame — a screenshot taken right after launch is a screenshot
-            // of the metering screen, not of the pre-first-reading state.
+            // of the metering screen, not of the pre-first-reading state. Unless
+            // the pre-first-reading state is what was asked for, in which case
+            // this loop simply never yields and the stream stays open.
+            guard emitsReadings else { return }
             continuation.yield(reading)
             while Task.isCancelled == false {
                 try? await Task.sleep(for: Self.emitInterval)
