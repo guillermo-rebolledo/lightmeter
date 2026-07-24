@@ -157,6 +157,22 @@ final class CameraLightSource: NSObject, LightSource {
         isConfigured = true
         // Aim AE at the current point (center by default) now the device exists.
         applyExposurePoint()
+
+        #if DEBUG
+        // Record the exposure state the device is left in — the issue's second
+        // question. `exposureMode` should read `2` (`.continuousAutoExposure`);
+        // any other value means configuration pinned the exposure and would
+        // explain a frozen headline.
+        if ReadingDiagnostics.isEnabled {
+            ReadingDiagnostics.logger.debug(
+                """
+                configured — exposureMode=\(device.exposureMode.rawValue, privacy: .public) \
+                pointOfInterestSupported=\(device.isExposurePointOfInterestSupported, privacy: .public) \
+                continuousSupported=\(device.isExposureModeSupported(.continuousAutoExposure), privacy: .public)
+                """
+            )
+        }
+        #endif
     }
 }
 
@@ -176,6 +192,14 @@ private final class ReadingSampler: NSObject, AVCaptureVideoDataOutputSampleBuff
     private let minInterval: CFTimeInterval = 0.1
     private var lastEmit: CFTimeInterval = 0
 
+    #if DEBUG
+    /// The running per-leg and EV ranges for the `-reading-diagnostics` repro
+    /// (#111). Touched only in `captureOutput`, which is always the serial sample
+    /// queue, so it needs no synchronization of its own.
+    private var diagnosticsSpans = ReadingSpans()
+    private var didLogFirstFrame = false
+    #endif
+
     init(device: AVCaptureDevice) {
         self.device = device
     }
@@ -193,6 +217,18 @@ private final class ReadingSampler: NSObject, AVCaptureVideoDataOutputSampleBuff
         didOutput sampleBuffer: CMSampleBuffer,
         from connection: AVCaptureConnection
     ) {
+        #if DEBUG
+        // The issue's first question is whether the delegate fires at all on
+        // device; log the very first frame so an empty run reads as "never
+        // fired" rather than "fired but never moved".
+        if ReadingDiagnostics.isEnabled, !didLogFirstFrame {
+            didLogFirstFrame = true
+            ReadingDiagnostics.logger.debug(
+                "captureOutput firing — first frame received, exposureMode=\(self.device.exposureMode.rawValue, privacy: .public)"
+            )
+        }
+        #endif
+
         let now = CACurrentMediaTime()
         guard now - lastEmit >= minInterval else { return }
         lastEmit = now
@@ -202,11 +238,27 @@ private final class ReadingSampler: NSObject, AVCaptureVideoDataOutputSampleBuff
         let aperture = Double(device.lensAperture)
         guard iso > 0, aperture > 0, duration > 0, duration.isFinite else { return }
 
+        let reading = LightReading(iso: iso, exposureDuration: duration, aperture: aperture)
+
+        #if DEBUG
+        // Narrate the emitted reading — the legs the camera chose, their EV, the
+        // exposure mode, and the running span — so a pan can be read straight out
+        // of the log and pasted into #111 as the captured finding.
+        if ReadingDiagnostics.isEnabled, let ev = ExposureEngine.evAtISO100(for: reading) {
+            diagnosticsSpans.record(reading: reading, ev: ev)
+            let line = ReadingDiagnostics.line(
+                reading: reading,
+                ev: ev,
+                exposureModeRawValue: device.exposureMode.rawValue,
+                spans: diagnosticsSpans
+            )
+            ReadingDiagnostics.logger.debug("\(line, privacy: .public)")
+        }
+        #endif
+
         lock.lock()
         let continuation = self.continuation
         lock.unlock()
-        continuation?.yield(
-            LightReading(iso: iso, exposureDuration: duration, aperture: aperture)
-        )
+        continuation?.yield(reading)
     }
 }
