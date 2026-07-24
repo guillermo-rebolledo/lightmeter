@@ -34,8 +34,9 @@ struct EVHeadlineReadoutTests {
         )
         let readout = EVHeadlineReadout(ev: 12.34, triangle: atISO400)
 
+        // The reference stays ISO 100 even though the meter is set to ISO 400.
         #expect(readout.caption.contains("ISO 100"))
-        #expect(readout.isoValue == "400")
+        #expect(atISO400.iso.label == "400")
     }
 
     // MARK: - The value
@@ -85,10 +86,10 @@ struct EVHeadlineReadoutTests {
 
     // MARK: - VoiceOver
 
-    /// Three values, three voices. A sighted reader tells them apart by size,
-    /// accent, and position; a VoiceOver user has only the words, so each element
-    /// names itself and the EV value carries the qualifier its caption gives
-    /// sighted readers.
+    /// Two values, two voices. A sighted reader tells them apart by size, accent,
+    /// and position; a VoiceOver user has only the words, so each element names
+    /// itself and the EV value carries the qualifier its caption gives sighted
+    /// readers. (ISO left the bar for the mode row, so it is no longer among them.)
     @Test func eachValueSpeaksItsOwnNameAndTheEVValueCarriesTheQualifier() {
         let readout = EVHeadlineReadout(ev: 12.34, triangle: sunny)
 
@@ -96,25 +97,12 @@ struct EVHeadlineReadoutTests {
         #expect(readout.accessibilityValue == "EV 12.3 at ISO 100")
         #expect(readout.solvedAccessibilityLabel == "Shutter")
         #expect(readout.solvedAccessibilityValue == sunny.marking(of: .shutter))
-        #expect(readout.isoAccessibilityLabel == "ISO")
-        #expect(readout.isoValue == "100")
 
         let spoken = [
             readout.accessibilityLabel,
             readout.solvedAccessibilityLabel,
-            readout.isoAccessibilityLabel,
         ]
         #expect(Set(spoken).count == spoken.count, "two elements answer to the same name")
-    }
-
-    /// The ISO value is the bar's one control that is not obviously one, so the
-    /// hint has to say what the tap does rather than leaving it to be discovered.
-    @Test func theISOHintNamesWhatTappingItDoes() {
-        let hint = EVHeadlineReadout.isoAccessibilityHint
-
-        #expect(hint.isEmpty == false)
-        #expect(hint.lowercased().contains("dial"))
-        #expect(hint.contains("ISO"))
     }
 }
 

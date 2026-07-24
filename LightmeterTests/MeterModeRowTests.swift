@@ -109,6 +109,7 @@ struct MeterModeRowTests {
         let iso = MeterModeRow.dialTargetCell(for: .iso, boundComponent: nil, isoMarking: "100")
         #expect(iso.accessibilityHint?.isEmpty == false)
         #expect(iso.accessibilityHint?.lowercased().contains("dial") == true)
+        #expect(iso.accessibilityHint?.contains("ISO") == true)
 
         for component in [ExposureComponent.aperture, .shutter] {
             let cell = MeterModeRow.dialTargetCell(for: component, boundComponent: nil, isoMarking: "100")

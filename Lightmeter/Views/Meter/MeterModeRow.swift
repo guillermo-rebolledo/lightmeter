@@ -143,7 +143,7 @@ struct MeterModeRow: View {
                 title: "ISO \(isoMarking)",
                 accessibilityLabel: ExposureComponent.iso.caption,
                 accessibilityValue: isoMarking,
-                accessibilityHint: EVHeadlineReadout.isoAccessibilityHint,
+                accessibilityHint: Self.isoCellHint,
                 isSelected: boundComponent == .iso
             )
         case .aperture, .shutter:
@@ -187,6 +187,11 @@ struct MeterModeRow: View {
     /// The hint on an aperture / shutter cell — a tap does two things at once, so
     /// VoiceOver is told rather than left to discover the priority half.
     static let priorityCellHint = "Holds this leg and points the dial at it"
+
+    /// The hint on the ISO cell — a value that doesn't look like a control, so the
+    /// hint says what the tap does (aim the dial, leave priority alone). Moved here
+    /// with ISO when it left the top EV bar.
+    static let isoCellHint = "Points the dial at the ISO scale"
 
     // MARK: - Drawing
 
