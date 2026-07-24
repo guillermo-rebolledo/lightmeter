@@ -133,6 +133,29 @@ enum LaunchDiagnostics {
     /// thread — it only reads the clock and logs — so the preview view (main) and
     /// the camera queues (background) can mark their own steps without hopping the
     /// actor.
+    /// Times a synchronous main-thread block and logs its duration if it holds long
+    /// enough to drop a frame — for pinning *which* warmup call parks the main
+    /// thread. The 2.4s stall the watchdog caught (#112) ends at first-frame
+    /// delivery, so the suspect is the preview layer touching the capture session's
+    /// lock while `startRunning()` holds it; wrapping that call names it outright.
+    @discardableResult
+    static func measureMainThread<T>(_ label: String, _ body: () -> T) -> T {
+        guard isEnabled else { return body() }
+        let start = CACurrentMediaTime()
+        let result = body()
+        let blockedMS = (CACurrentMediaTime() - start) * 1000
+        if blockedMS >= hangThreshold * 1000 {
+            logger.notice(
+                "mainThreadBlock \(label, privacy: .public) \(String(format: "%.1f", blockedMS), privacy: .public)ms at +\(String(format: "%.1f", elapsedMilliseconds()), privacy: .public)ms"
+            )
+        }
+        return result
+    }
+
+    /// Stamps a warmup milestone with its offset from launch. Safe to call from any
+    /// thread — it only reads the clock and logs — so the preview view (main) and
+    /// the camera queues (background) can mark their own steps without hopping the
+    /// actor.
     static func mark(_ milestone: Milestone) {
         guard isEnabled else { return }
         logger.notice(

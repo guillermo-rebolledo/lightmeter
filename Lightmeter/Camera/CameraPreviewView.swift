@@ -69,7 +69,22 @@ struct CameraPreviewView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: PreviewView, context: Context) {
-        uiView.videoPreviewLayer.session = session
+        // Only (re)attach the session when it actually changed. This runs on every
+        // SwiftUI update — and there are many during warmup — so re-assigning the
+        // same session each time is wasted work at best. At worst it touches the
+        // capture session's lock while `startRunning()` holds it on the session
+        // queue, which is where #112 caught the main thread blocking for ~2.4s
+        // during warmup, freezing the ruler. Assigning only on a real change keeps
+        // the render path off that lock once the session is attached.
+        if uiView.videoPreviewLayer.session !== session {
+            #if DEBUG
+            LaunchDiagnostics.measureMainThread("updateUIView.session") {
+                uiView.videoPreviewLayer.session = session
+            }
+            #else
+            uiView.videoPreviewLayer.session = session
+            #endif
+        }
         context.coordinator.onPlaceSpot = onPlaceSpot
         context.coordinator.isSpotActive = isSpotActive
         uiView.updateReticle(devicePoint: spot, visible: isSpotActive)
