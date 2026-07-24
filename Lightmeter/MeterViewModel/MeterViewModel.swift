@@ -189,6 +189,21 @@ final class MeterViewModel {
                     guard let ev = ExposureEngine.evAtISO100(for: reading) else { continue }
                     self.latestReading = reading
                     self.rawEV = ev
+                    #if DEBUG
+                    // The issue's third question: confirm each reading reaches the
+                    // observable state so `@Observable` can propagate it to the
+                    // headline. This loop is main-actor isolated by construction
+                    // (the enclosing `Task` inherits `MeterViewModel`'s actor), so
+                    // the mutation is guaranteed on the main actor; the logged
+                    // `isMainThread` is a runtime proxy for that — the main actor
+                    // runs on the main thread — so a `false` here would be the
+                    // surprise worth chasing.
+                    if ReadingDiagnostics.isEnabled {
+                        ReadingDiagnostics.logger.debug(
+                            "rawEV updated ev=\(ev, privacy: .public) onMainThread=\(Thread.isMainThread, privacy: .public)"
+                        )
+                    }
+                    #endif
                 }
                 // A stream that ends before capture emits anything means the
                 // camera could not be configured. A stream that had produced
