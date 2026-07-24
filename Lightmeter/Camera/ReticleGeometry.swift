@@ -5,45 +5,32 @@ import CoreGraphics
 /// The reticle is drawn twice: by `ReticleView` in UIKit, because only the
 /// preview layer can map a normalized device point to a layer point, and by the
 /// design harness in SwiftUI, because in the Simulator there is no preview layer
-/// to map through. Two drawings of one bracket is a standing invitation to drift
+/// to map through. Two drawings of one reticle is a standing invitation to drift
 /// — and the thing that drifts is exactly what design decisions get judged from.
 ///
 /// So the *geometry* lives here once and both renderers read it. Each still owns
-/// its own stroking, since a `CAShapeLayer` and a SwiftUI `Shape` want different
-/// path types, but neither owns a dimension.
+/// its own stroking, since a `CAShapeLayer` and a SwiftUI view want different
+/// primitives, but neither owns a dimension.
+///
+/// Since #96 it is a **circle** rather than the tap-to-focus corner brackets, and
+/// it carries no reading of its own: EV is the headline of the bar at the top of
+/// the screen, and the reticle is back to marking a point.
 enum ReticleGeometry {
-    /// The bracket's side length.
-    static let side: CGFloat = 78
+    /// The circle's diameter — the handoff's 64pt.
+    static let diameter: CGFloat = 64
 
-    /// The gap between the bracket and the EV badge hanging beneath it — clears
-    /// the bracket without drifting far from the point it annotates.
-    static let badgeGap: CGFloat = 6
+    /// The rim's stroke width and its opacity against the scene. White rather
+    /// than accent, so the reticle reads as a marker on the frame rather than as
+    /// one more accented value.
+    ///
+    /// The handoff's `1px rgba(255,255,255,.4)`, opened up: over the harness'
+    /// blown window a 0.4 white hairline is invisible, which is exactly the
+    /// failure the stand-in scenes exist to catch. The rim carries a drop shadow
+    /// in both renderers for the same reason.
+    static let rimWidth: CGFloat = 1.5
+    static let rimOpacity: CGFloat = 0.75
 
-    /// The centre dot's radius.
-    static let dotRadius: CGFloat = 2
-
-    /// How far the bracket's stroke sits inside its own bounds.
-    private static let inset: CGFloat = 2
-
-    /// Each corner tick's length, as a fraction of the side.
-    private static let tickRatio: CGFloat = 0.22
-
-    /// The four L-shaped corner brackets, as open polylines in a `side × side`
-    /// square. Each inner array is one corner, to be stroked as a connected run.
-    static func bracketPolylines(side: CGFloat = side) -> [[CGPoint]] {
-        let tick = side * tickRatio
-        let lo = inset
-        let hi = side - inset
-
-        return [
-            // Top-left
-            [CGPoint(x: lo, y: lo + tick), CGPoint(x: lo, y: lo), CGPoint(x: lo + tick, y: lo)],
-            // Top-right
-            [CGPoint(x: hi - tick, y: lo), CGPoint(x: hi, y: lo), CGPoint(x: hi, y: lo + tick)],
-            // Bottom-right
-            [CGPoint(x: hi, y: hi - tick), CGPoint(x: hi, y: hi), CGPoint(x: hi - tick, y: hi)],
-            // Bottom-left
-            [CGPoint(x: lo + tick, y: hi), CGPoint(x: lo, y: hi), CGPoint(x: lo, y: hi - tick)],
-        ]
-    }
+    /// The centre dot's radius. Accent, and the only accent in the frame — this
+    /// is the point being measured.
+    static let dotRadius: CGFloat = 2.5
 }

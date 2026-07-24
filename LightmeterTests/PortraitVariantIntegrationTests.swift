@@ -208,22 +208,25 @@ struct PortraitVariantIntegrationTests {
         }
     }
 
-    /// EV keeps its own voice wherever it lives — badging the reticle in spot,
-    /// as the quiet label in average — so a VoiceOver user can tell a point
-    /// reading from a whole-frame one, which sighted users read off the reticle.
-    @Test func evNamesWhichReadItIsInBothPatterns() async {
+    /// EV has one home now — the headline bar — and it reads the same in both
+    /// metering patterns, because it reports the scene rather than the point.
+    ///
+    /// This is what the reticle's silence buys: sighted users tell a spot read
+    /// from a whole-frame one by the reticle's presence, and a VoiceOver user by
+    /// the metering-pattern pill, rather than by two differently-named EV
+    /// elements that used to be the only difference between the two.
+    @Test func evReadsTheSceneInBothPatterns() async {
         let model = await meteringModel()
 
         model.setPattern(.spot)
         model.placeSpot(at: .frameCenter)
-        let spot = PreviewEVReadout(pattern: model.pattern, spot: model.spot, ev: model.ev)
-        #expect(spot?.badgeValue != nil)
+        let spot = EVHeadlineReadout(ev: model.ev, triangle: model.triangle)
 
         model.setPattern(.average)
-        let average = PreviewEVReadout(pattern: model.pattern, spot: model.spot, ev: model.ev)
-        #expect(average?.secondaryValue != nil)
+        let average = EVHeadlineReadout(ev: model.ev, triangle: model.triangle)
 
-        #expect(spot?.accessibilityLabel != average?.accessibilityLabel)
+        #expect(spot == average)
+        #expect(spot.accessibilityValue.contains("ISO 100"))
     }
 
     // MARK: - Guided tour off

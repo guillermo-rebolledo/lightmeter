@@ -26,6 +26,14 @@ struct MeterHUDCard: View {
     let advisories: [ExposureAdvisory]
     let isTourActive: Bool
 
+    /// Whether the card carries the freeze padlock beside its hero.
+    ///
+    /// `false` in portrait since #96, where the padlock was rehoused into the EV
+    /// headline bar — the mock has no home for it, and one padlock on the screen
+    /// is the point of it. Landscape has no bar, so it keeps the padlock here and
+    /// is otherwise untouched.
+    var includesFreezeButton = true
+
     var body: some View {
         VStack(spacing: 12) {
             // The freeze padlock floats on the trailing edge as an overlay, so the
@@ -37,13 +45,15 @@ struct MeterHUDCard: View {
             SolvedLegReadoutView(triangle: model.triangle)
                 .frame(maxWidth: .infinity)
                 .overlay(alignment: .trailing) {
-                    FreezeButton(
-                        isFrozen: model.isFrozen,
-                        // Mirror `toggleFreeze`'s own guard so the button stays
-                        // enabled in every state the toggle accepts.
-                        canFreeze: model.latestReading != nil || model.isFrozen,
-                        onToggle: model.toggleFreeze
-                    )
+                    if includesFreezeButton {
+                        FreezeButton(
+                            isFrozen: model.isFrozen,
+                            // Mirror `toggleFreeze`'s own guard so the button stays
+                            // enabled in every state the toggle accepts.
+                            canFreeze: model.latestReading != nil || model.isFrozen,
+                            onToggle: model.toggleFreeze
+                        )
+                    }
                 }
                 .id(GuidedTourStep.evReadout)
             MeterAdvisories(advisories: advisories, isTourActive: isTourActive, isCompact: true)
