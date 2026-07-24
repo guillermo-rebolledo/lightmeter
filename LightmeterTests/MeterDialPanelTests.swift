@@ -123,11 +123,10 @@ struct MeterDialPanelTests {
         }
     }
 
-    /// …and identical across the compensation value the new track carries. `-3`,
-    /// `0`, `+3`: the signed readout is one scale-to-fit line and the track is a
-    /// fixed-height band, so nudging the bias never lifts the rule out from under
-    /// the thumb dragging it — the AC's "panel height is unchanged by compensation
-    /// value".
+    /// …and identical across the compensation value the on-demand readout carries.
+    /// `-3`, `0`, `+3`: the signed readout is one scale-to-fit line in a fixed-height
+    /// pill, so nudging the bias never lifts the rule out from under the thumb
+    /// dragging it — the AC's "panel height is unchanged by compensation value".
     @Test func theCompensationValueNeverResizesThePanel() async {
         let model = await meteringModel()
         let baseline = panelSize(model, advisories: [])
@@ -137,6 +136,68 @@ struct MeterDialPanelTests {
             #expect(model.compensation == bias)
             #expect(panelSize(model, advisories: []).height == baseline.height, "\(bias) EV")
         }
+    }
+
+    /// …and identical whether or not the ruler is bound to compensation. Summoning
+    /// the comp dial only tints and rings the readout — a stroke and fill inside its
+    /// own bounds — so the panel holds still as the photographer moves in and out of
+    /// compensation.
+    @Test func summoningTheCompDialNeverResizesThePanel() async {
+        let model = await meteringModel()
+        let baseline = panelSize(model, advisories: [])
+
+        model.bindCompensationDial()
+        #expect(model.isCompensationDialBound)
+        #expect(panelSize(model, advisories: []).height == baseline.height)
+    }
+}
+
+/// The compensation on-demand readout that replaces the permanent slider: what it
+/// shows, that it shows it even at zero, and that its tap summons and dismisses the
+/// comp dial. Driven through a real `MeterViewModel` so the readout's contract is
+/// pinned against the paths the panel actually wires it to.
+@MainActor
+struct CompensationReadoutTests {
+    private func model() -> MeterViewModel {
+        MeterViewModel(source: FakeLightSource())
+    }
+
+    /// The readout shows the live bias — the same signed label the panel feeds it —
+    /// and shows it even at zero, because it is the only trigger and so can never
+    /// hide when there is no bias yet to report.
+    @Test func theReadoutShowsTheBiasAndIsPresentAtZero() {
+        let model = model()
+
+        #expect(model.compensation == 0)
+        #expect(model.compensationLabel.isEmpty == false)
+
+        model.setCompensation(0.3)
+        #expect(model.compensationLabel.contains("0.3"))
+    }
+
+    /// Tapping the readout summons the comp dial; tapping again brings the ruler
+    /// home to the priority leg — the readout is both the way in and the way out.
+    @Test func tappingTheReadoutTogglesTheCompDial() {
+        let model = model()
+        #expect(model.isCompensationDialBound == false)
+
+        // Way in.
+        model.bindCompensationDial()
+        #expect(model.isCompensationDialBound)
+        #expect(model.boundComponent == nil)
+
+        // Way out — home to the priority leg.
+        model.bindCompensationDial()
+        #expect(model.isCompensationDialBound == false)
+        #expect(model.boundComponent == model.mode.lockedComponent)
+    }
+
+    /// The readout is reachable and speaks its bias and what its tap does, so
+    /// on-demand comp is not sighted-only.
+    @Test func theReadoutIsLabelledForVoiceOver() {
+        #expect(CompensationReadout.accessibilityLabel.isEmpty == false)
+        #expect(CompensationReadout.accessibilityHint.isEmpty == false)
+        #expect(CompensationReadout.accessibilityHint.lowercased().contains("dial"))
     }
 }
 

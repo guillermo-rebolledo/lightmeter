@@ -8,16 +8,16 @@ import Foundation
 // floating bar pinned to the top of the meter.
 //
 // That promotion raises the cost of ADR-0001 from "a quiet number is ambiguous"
-// to "the headline is wrong": the bar puts an ISO readout inches from the value,
-// which is exactly the arrangement that invites reading EV as being quoted at
-// *that* ISO. So the qualifier is part of the caption here rather than a
-// decoration a layout can drop.
+// to "the headline is wrong": EV read bare invites being taken as quoted at
+// whatever sensitivity the meter is set to. So the reference is part of the
+// caption here rather than a decoration a layout can drop.
 //
 // Pure over the already-published `ev` / `triangle`, so what the bar says is
 // tested without a view — the same shape as `SolvedLegReadout`.
 
-/// The EV headline bar's content: the scene's brightness, the leg the engine
-/// solved, and the photographer's ISO.
+/// The EV headline bar's content: the scene's brightness and the leg the engine
+/// solved. (ISO used to ride the bar too, but it has moved to the mode row with
+/// the other legs the dial turns, so it is no longer part of the headline.)
 struct EVHeadlineReadout: Equatable {
     /// Names the value below it *and the sensitivity it is quoted at* — e.g.
     /// `"Exposure value @ ISO 100"`. Cased for display by the view.
@@ -29,7 +29,24 @@ struct EVHeadlineReadout: Equatable {
 
     /// The scene reading as shown — e.g. `"EV 12.3"`, or `"EV —"` before the
     /// first reading rather than a stale or invented number.
-    let value: String
+    ///
+    /// The whole string, kept intact so VoiceOver reads a single value; the bar
+    /// typesets it as a small ``unit`` prefix over the large ``evValue`` number,
+    /// which is presentation only and leaves this — and the accessibility value
+    /// derived from it — unchanged. Composed from the pieces rather than stored, so
+    /// the whole string and its parts can never drift.
+    var value: String { "\(Self.unit) \(evValue)" }
+
+    /// The unit prefix the bar draws small before the number — always `"EV"`.
+    /// The bar splits the headline so `EV` reads as a quiet unit on the big
+    /// figure rather than a same-size word held a digit away from it; the split
+    /// is view typography, so the pieces live here but ``value`` stays whole.
+    static let unit = "EV"
+
+    /// The scene reading *without* its `EV` prefix — `"12.3"`, or the em-dash
+    /// placeholder while pending — so the bar can render the number as its own
+    /// large tabular run beside the small ``unit``.
+    let evValue: String
 
     /// Names the leg the engine answered for — `"Shutter"` in aperture-priority,
     /// `"Aperture"` in shutter-priority. Spoken rather than drawn: sighted readers
@@ -39,10 +56,6 @@ struct EVHeadlineReadout: Equatable {
     /// The solved leg's snapped dial marking (`"1/125"`, `"f/16"`), or the app's
     /// em-dash placeholder while the solve is pending.
     let solvedValue: String
-
-    /// The photographer's ISO as a camera marks it — `"400"`. An input, never
-    /// solved, and the bar's one tappable value.
-    let isoValue: String
 
     /// Names which read this is. The bar reports the *scene*, not the metered
     /// point: since #96 the reticle carries no reading of its own.
@@ -61,12 +74,6 @@ struct EVHeadlineReadout: Equatable {
     /// few inches below this one, and the two must not describe it differently.
     let solvedAccessibilityValue: String
 
-    var isoAccessibilityLabel: String { "ISO" }
-
-    /// The ISO value is the bar's one control that does not look like one, so the
-    /// hint says what the tap does rather than leaving it to be discovered.
-    static let isoAccessibilityHint = "Points the dial at the ISO scale"
-
     /// Whether the scene has yet been read.
     private let isPending: Bool
 
@@ -83,7 +90,7 @@ extension EVHeadlineReadout {
     init(ev: Double?, triangle: ExposureTriangle) {
         caption = "Exposure value @ ISO \(Self.referenceISO)"
         isPending = ev == nil
-        value = "EV \(ev.map(Self.label) ?? ExposureTriangle.pendingMarking)"
+        evValue = ev.map(Self.label) ?? ExposureTriangle.pendingMarking
 
         // The solved leg is derived by `SolvedLegReadout`, not re-derived here:
         // the drawer's hero renders the same leg a few inches below this one, and
@@ -95,8 +102,6 @@ extension EVHeadlineReadout {
         solvedCaption = triangle.solved.caption
         solvedValue = solved.value ?? ExposureTriangle.pendingMarking
         solvedAccessibilityValue = solved.accessibilityValue
-
-        isoValue = triangle.iso.label
     }
 
     /// The sensitivity EV is always quoted at (ADR-0001).

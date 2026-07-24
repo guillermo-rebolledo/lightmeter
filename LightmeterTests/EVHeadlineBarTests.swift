@@ -64,9 +64,9 @@ struct EVHeadlineBarTests {
     }
 
     /// Every value in the bar changes width as the light and the settings move:
-    /// `EV 9.5` to `EV -1.3`, `1/8000` to `30"`, `ISO 100` to `ISO 12800`. None of
-    /// them may resize the bar around them — they are one scale-to-fit line each,
-    /// and the trailing pair holds its own column.
+    /// `EV 9.5` to `EV -1.3`, and the solved leg from `1/8000` to `30"`. Changing
+    /// ISO re-solves that leg underneath them all. None of it may resize the bar —
+    /// each value is one scale-to-fit line, and the solved leg holds its own column.
     @Test func noValueTheMeterProducesResizesTheBar() async {
         let model = await meteringModel()
         let baseline = barSize(model)
@@ -91,9 +91,9 @@ struct EVHeadlineBarTests {
         }
     }
 
-    /// Tapping ISO rings its outline. The ring is a stroke inside the control's
-    /// own bounds — the same vocabulary, and the same no-cost geometry, the
-    /// exposure chips use — so binding the dial cannot nudge the bar.
+    /// Binding the dial to ISO — now driven from the mode row rather than the bar —
+    /// still touches nothing in the bar: ISO left the trailing end, so pointing the
+    /// dial at it cannot nudge the headline.
     @Test func bindingTheDialToISONeverResizesTheBar() async {
         let model = await meteringModel()
         let baseline = barSize(model)
@@ -104,33 +104,6 @@ struct EVHeadlineBarTests {
     }
 
     // MARK: - What the controls do
-
-    /// The bar's one tappable value: ISO points the ruler dial at the ISO scale,
-    /// through the same entry point a chip tap uses. ISO is never the solved leg,
-    /// so this is always available.
-    @Test func tappingISOPointsTheDialAtTheISOScale() async {
-        let model = await meteringModel()
-        model.selectChip(.aperture)
-        #expect(model.boundComponent == .aperture)
-
-        model.selectChip(.iso)
-
-        #expect(model.boundComponent == .iso)
-        #expect(model.dialCaption == ExposureComponent.iso.caption)
-        #expect(model.dialLabels.isEmpty == false)
-    }
-
-    /// …in both priority modes, since which leg is solved changes underneath it.
-    @Test func ISOIsAlwaysDialableWhicheverLegIsSolved() async {
-        let model = await meteringModel()
-
-        for mode in [PriorityMode.aperturePriority, .shutterPriority] {
-            model.setMode(mode)
-            #expect(model.isEditable(.iso), "\(mode)")
-            model.selectChip(.iso)
-            #expect(model.boundComponent == .iso, "\(mode)")
-        }
-    }
 
     /// The padlock still drives freeze from its new home, and reports the state
     /// its glyph shows sighted users.
@@ -163,12 +136,7 @@ struct EVHeadlineBarTests {
         let readout = EVHeadlineReadout(ev: model.ev, triangle: model.triangle)
 
         let headline = idealWidth(EVHeadlineValue(readout: readout), at: size)
-        let trailing = idealWidth(
-            EVHeadlineTrailingPair(
-                readout: readout, isDialBoundToISO: false, onSelectISO: {}
-            ),
-            at: size
-        )
+        let trailing = idealWidth(EVHeadlineSolvedLeg(readout: readout), at: size)
         #expect(trailing > 0)
         let padlock = idealWidth(
             FreezeButton(isFrozen: false, canFreeze: true, onToggle: {}, hasSurface: false),
@@ -176,7 +144,7 @@ struct EVHeadlineBarTests {
         )
 
         let needed = headline * EVHeadlineValue.minimumScale
-            + trailing * EVHeadlineTrailingPair.minimumScale
+            + trailing * EVHeadlineSolvedLeg.minimumScale
             + padlock
             + MeterSettingsGear.touchTarget
             + 3 * EVHeadlineBar.itemSpacing
@@ -239,18 +207,17 @@ struct EVHeadlineBarTests {
 
     // MARK: - VoiceOver
 
-    /// The three values are separate elements with distinct names, and the ISO
-    /// control carries a hint saying what the tap does. Pinned on the readout the
-    /// view renders from, so the words are testable without walking the
-    /// accessibility tree.
-    @Test func theBarsThreeValuesAreSeparatelyLabelled() async {
+    /// The bar's two values — the scene EV and the solved leg — are separate
+    /// elements with distinct names. Pinned on the readout the view renders from,
+    /// so the words are testable without walking the accessibility tree. (ISO's
+    /// label and hint moved to the mode row with the control itself.)
+    @Test func theBarsValuesAreSeparatelyLabelled() async {
         let model = await meteringModel()
         let readout = EVHeadlineReadout(ev: model.ev, triangle: model.triangle)
 
         let labels = [
             readout.accessibilityLabel,
             readout.solvedAccessibilityLabel,
-            readout.isoAccessibilityLabel,
         ]
         #expect(labels.allSatisfy { $0.isEmpty == false })
         #expect(Set(labels).count == labels.count)
@@ -258,10 +225,7 @@ struct EVHeadlineBarTests {
         let values = [
             readout.accessibilityValue,
             readout.solvedAccessibilityValue,
-            readout.isoValue,
         ]
         #expect(values.allSatisfy { $0.isEmpty == false })
-
-        #expect(EVHeadlineReadout.isoAccessibilityHint.isEmpty == false)
     }
 }
