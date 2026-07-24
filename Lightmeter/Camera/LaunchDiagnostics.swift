@@ -62,10 +62,12 @@ enum LaunchDiagnostics {
     static let logger = Logger(subsystem: "com.lightmeter", category: "launch")
 
     /// A main-queue round trip slower than this counts as a stall worth logging —
-    /// past it the main thread was busy enough to have swallowed a touch. 100ms is
-    /// well beyond ordinary scheduling jitter (a probe normally lands in under a
-    /// millisecond) but short enough to catch a hitch the eye would still feel.
-    static let hangThreshold: CFTimeInterval = 0.1
+    /// past it the main thread was busy enough to have swallowed a touch. Tuned to
+    /// ~two dropped frames (33ms): the first on-device run showed no stall at the
+    /// 100ms floor, so the threshold is dropped here to catch a train of smaller
+    /// hitches that a coarse floor would hide, while still sitting well above the
+    /// sub-millisecond a probe lands in when the main thread is idle.
+    static let hangThreshold: CFTimeInterval = 0.033
 
     /// Whether a measured main-queue round-trip latency counts as a stall — the
     /// watchdog's decision, split out so the boundary is pinned by a test.
@@ -88,6 +90,7 @@ enum LaunchDiagnostics {
     enum Milestone: String {
         case previewAttachBegan
         case previewAttachEnded
+        case authorizationResolved
         case sessionStartRequested
         case sessionRunning
         case firstFrame

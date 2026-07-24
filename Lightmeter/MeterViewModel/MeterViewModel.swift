@@ -165,6 +165,12 @@ final class MeterViewModel {
         case .denied:
             status = .denied
         case .authorized:
+            #if DEBUG
+            // #112: stamp when the camera-permission check resolved, to localise
+            // the launch delay — a large offset here puts it in authorization; a
+            // near-zero one puts it in the configure/start that follows.
+            LaunchDiagnostics.mark(.authorizationResolved)
+            #endif
             // The permission prompt is a suspension point. If the view went away
             // while we were waiting (its `.task` was cancelled and `stop()` ran),
             // don't spin the camera back up.
